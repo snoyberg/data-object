@@ -3,7 +3,7 @@
 {-# LANGUAGE OverlappingInstances #-}
 ---------------------------------------------------------
 --
--- Module        : Web.ClientSession
+-- Module        : Data.Object
 -- Copyright     : Michael Snoyman
 -- License       : BSD3
 --
