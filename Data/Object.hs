@@ -18,7 +18,8 @@
 --
 ---------------------------------------------------------
 module Data.Object
-    ( Object (..)
+    ( Object
+    , GenObject (..)
     , FromObject (..)
     , ToObject (..)
     , FromScalar (..)
@@ -26,16 +27,18 @@ module Data.Object
     , oLookup
     ) where
 
-import qualified Data.ByteString as B
+import qualified Data.ByteString.Lazy as B
 import Data.ByteString.Class
 import Control.Arrow
 import Data.Time.Calendar
 
-data Object =
-    Mapping [(B.ByteString, Object)]
-    | Sequence [Object]
-    | Scalar B.ByteString
+data GenObject key val =
+    Mapping [(key, GenObject key val)]
+    | Sequence [GenObject key val]
+    | Scalar val
     deriving (Show)
+
+type Object = GenObject B.ByteString B.ByteString
 
 class ToObject a where
     toObject :: a -> Object
@@ -61,9 +64,9 @@ instance FromObject B.ByteString where
     fromObject = bsFromObject
 
 instance ToScalar String where
-    toScalar = toStrictByteString
+    toScalar = toLazyByteString
 instance FromScalar String where
-    fromScalar = return . fromStrictByteString
+    fromScalar = return . fromLazyByteString
 instance ToObject String where
     toObject = Scalar . toScalar
 instance FromObject String where
@@ -113,12 +116,12 @@ readM s = case reads s of
 -- instances
 
 instance ToScalar Day where
-    toScalar = toStrictByteString . show
+    toScalar = toLazyByteString . show
 instance ToObject Day where
     toObject = toObject . toScalar
 instance FromScalar Day where
     fromScalar bs = do
-        let s = fromStrictByteString bs
+        let s = fromLazyByteString bs
         if length s /= 10
             then fail ("Invalid day: " ++ s)
             else do
