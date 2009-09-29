@@ -31,6 +31,7 @@ import qualified Data.ByteString.Lazy as B
 import Data.ByteString.Class
 import Control.Arrow
 import Data.Time.Calendar
+import Safe (readMay)
 
 data GenObject key val =
     Mapping [(key, GenObject key val)]
@@ -108,11 +109,6 @@ oLookup key pairs =
         Nothing -> fail $ "Key not found: " ++ show key
         Just x -> fromObject x
 
--- helper
-readM :: (Read r, Monad m) => String -> m r
-readM s = case reads s of
-            ((x, _):_) -> return x
-            _ -> fail $ "Unable to read: " ++ s
 -- instances
 
 instance ToScalar Day where
@@ -125,9 +121,38 @@ instance FromScalar Day where
         if length s /= 10
             then fail ("Invalid day: " ++ s)
             else do
-                y <- readM $ take 4 s
-                m <- readM $ take 2 $ drop 5 s
-                d <- readM $ take 2 $ drop 8 s
-                return $ fromGregorian y m d
+                let x = do
+                    y' <- readMay $ take 4 s
+                    m' <- readMay $ take 2 $ drop 5 s
+                    d' <- readMay $ take 2 $ drop 8 s
+                    return (y', m', d')
+                case x of
+                    Just (y, m, d) -> return $ fromGregorian y m d
+                    Nothing -> fail $ "Invalid day: " ++ s
 instance FromObject Day where
+    fromObject o = fromObject o >>= fromScalar
+
+instance ToScalar Bool where
+    toScalar b = toScalar $ if b then "true" else "false"
+instance ToObject Bool where
+    toObject = toObject . toScalar
+instance FromScalar Bool where
+    fromScalar bs =
+        case fromLazyByteString bs of
+            "true" -> return True
+            "false" -> return False
+            x -> fail $ "Invalid bool value: " ++ x
+instance FromObject Bool where
+    fromObject o = fromObject o >>= fromScalar
+
+instance ToScalar Int where
+    toScalar = toScalar . show
+instance ToObject Int where
+    toObject = toObject . toScalar
+instance FromScalar Int where
+    fromScalar bs =
+        case readMay $ fromLazyByteString bs of
+            Nothing -> fail $ "Invalid integer: " ++ fromLazyByteString bs
+            Just i -> return i
+instance FromObject Int where
     fromObject o = fromObject o >>= fromScalar
