@@ -28,6 +28,7 @@ module Data.Object
     ) where
 
 import qualified Data.ByteString.Lazy as B
+import qualified Data.ByteString as BS
 import Data.ByteString.Class
 import Control.Arrow
 import Data.Time.Calendar
@@ -63,6 +64,15 @@ instance ToObject B.ByteString where
     toObject = Scalar
 instance FromObject B.ByteString where
     fromObject = bsFromObject
+
+instance ToScalar BS.ByteString where
+    toScalar = toLazyByteString
+instance FromScalar BS.ByteString where
+    fromScalar = return . fromLazyByteString
+instance ToObject BS.ByteString where
+    toObject = Scalar . toScalar
+instance FromObject BS.ByteString where
+    fromObject o = fromObject o >>= fromScalar
 
 instance ToScalar String where
     toScalar = toLazyByteString
