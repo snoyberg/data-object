@@ -19,6 +19,7 @@ library
     build-depends:   base >= 4 && < 5,
                      bytestring-class,
                      bytestring >= 0.9.1.4 && < 1,
+                     text >= 0.5,
                      time >= 1,
                      safe,
                      test-framework,
@@ -27,4 +28,5 @@ library
                      HUnit,
                      QuickCheck >= 1 && < 2
     exposed-modules: Data.Object
+                     Data.Scalar
     ghc-options:     -Wall
