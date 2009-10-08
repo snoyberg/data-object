@@ -20,6 +20,11 @@ library
                      bytestring-class,
                      bytestring >= 0.9.1.4 && < 1,
                      time >= 1,
-                     safe
+                     safe,
+                     test-framework,
+                     test-framework-quickcheck,
+                     test-framework-hunit,
+                     HUnit,
+                     QuickCheck >= 1 && < 2
     exposed-modules: Data.Object
     ghc-options:     -Wall
