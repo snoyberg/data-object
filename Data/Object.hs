@@ -39,6 +39,13 @@ import Control.Arrow
 import Data.Time.Calendar
 import Safe (readMay)
 import Control.Applicative
+import Control.Monad (liftM2)
+
+import Prelude hiding (mapM, sequence)
+
+import Data.Foldable
+import Data.Traversable
+import Data.Monoid
 
 import Test.Framework (testGroup, Test)
 --import Test.Framework.Providers.HUnit
@@ -83,12 +90,6 @@ mapKeysValuesM fk fv (Sequence os)=
     Sequence <$> mapM (mapKeysValuesM fk fv) os
 mapKeysValuesM fk fv (Mapping pairs) =
     Mapping <$> mapM (liftPair . (fk *** mapKeysValuesM fk fv)) pairs
-    where
-        liftPair :: Monad m => (m a, m b) -> m (a, b)
-        liftPair (a, b) = do
-            a' <- a
-            b' <- b
-            return $! (a', b')
 
 propMapKeysValuesId :: Object Int Int -> Bool
 propMapKeysValuesId o = mapKeysValues id id o == o
@@ -165,10 +166,7 @@ propToFromRawObject :: Object Int Int -> Bool
 propToFromRawObject o = fromRawObject (toRawObject o) == Just o
 
 liftPair :: Monad m => (m a, m b) -> m (a, b)
-liftPair (a, b) = do
-    a' <- a
-    b' <- b
-    return (a', b')
+liftPair = uncurry $ liftM2 (,)
 
 oLookup :: (MonadFail m, Eq a, Show a, FromRawObject b)
         => a -- ^ key
@@ -239,3 +237,19 @@ instance Arbitrary (Object Int Int) where
         arbS = Scalar `fmap` (arbitrary :: Gen Int)
         arbL = Sequence `fmap` vector 2
         arbM = Mapping `fmap` vector 1
+
+instance Functor (Object key) where
+    fmap = mapValues
+
+instance Foldable (Object key) where
+    foldMap f (Scalar v) = f v
+    foldMap f (Sequence vs) = mconcat $ map (foldMap f) vs
+    foldMap f (Mapping pairs) = mconcat $ map (foldMap f . snd) pairs
+
+instance Traversable (Object key) where
+    traverse f (Scalar v) = Scalar <$> f v
+    traverse f (Sequence vs) =
+        Sequence <$> traverse (traverse f) vs
+    traverse f (Mapping pairs) =
+        let helper (x, y') = pure ((,) x) <*> y'
+         in Mapping <$> traverse (helper . second (traverse f)) pairs
