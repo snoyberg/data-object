@@ -39,7 +39,7 @@ import Control.Arrow
 import Data.Time.Calendar
 import Safe (readMay)
 import Control.Applicative
-import Control.Monad (liftM2)
+import Control.Monad (liftM2, ap)
 
 import Prelude hiding (mapM, sequence)
 
@@ -68,6 +68,7 @@ data Object key val =
 mapKeys :: (key1 -> key2) -> Object key1 val -> Object key2 val
 mapKeys = flip mapKeysValues id
 
+-- | This is equivalent to 'fmap'.
 mapValues :: (val1 -> val2) -> Object key val1 -> Object key val2
 mapValues = mapKeysValues id
 
@@ -253,3 +254,18 @@ instance Traversable (Object key) where
     traverse f (Mapping pairs) =
         let helper (x, y') = pure ((,) x) <*> y'
          in Mapping <$> traverse (helper . second (traverse f)) pairs
+
+-- from Nicolas Pouillard, I'm not smart enough to come up with this on
+-- my own
+joinObj :: Object key (Object key scalar) -> Object key scalar
+joinObj (Scalar x)    = x
+joinObj (Sequence xs) = Sequence (map joinObj xs)
+joinObj (Mapping  xs) = Mapping  (map (second joinObj) xs)
+
+instance Monad (Object key) where
+    return = Scalar
+    x >>= f = joinObj . fmap f $ x
+
+instance Applicative (Object key) where
+    pure  = Scalar
+    (<*>) = ap
