@@ -1,3 +1,5 @@
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE FlexibleInstances #-}
 ---------------------------------------------------------
 --
 -- Module        : Data.Object
@@ -24,11 +26,16 @@ module Data.Object
     , getScalar
     , getSequence
     , getMapping
+    , ToScalar (..)
+    , FromScalar (..)
+    , ToObject (..)
+    , FromObject (..)
+    , Assoc (..) -- FIXME consider removing this again
     ) where
 
 import Control.Arrow
 import Control.Applicative
-import Control.Monad (liftM2, ap)
+import Control.Monad (liftM2, ap, (<=<))
 
 import Prelude hiding (mapM, sequence)
 
@@ -118,3 +125,76 @@ getSequence _ = fail "Attempt to extract a sequence from non-sequence"
 getMapping :: MonadFail m => Object k v -> m [(k, Object k v)]
 getMapping (Mapping m) = return m
 getMapping _ = fail "Attempt to extract a mapping from non-mapping"
+
+class ToScalar x y where
+    toScalar :: x -> y
+class FromScalar x y where
+    fromScalar :: MonadFail m => y -> m x
+class ToObject a k v where
+    toObject :: a -> Object k v
+
+    listToObject :: [a] -> Object k v
+    listToObject = Sequence . map toObject
+
+    -- FIXME is this actually necesary?
+    mapToObject :: ToScalar k' k => [(k', a)] -> Object k v
+    mapToObject = Mapping . map (toScalar *** toObject)
+
+class FromObject a k v where
+    fromObject :: MonadFail m => Object k v -> m a
+
+    listFromObject :: MonadFail m => Object k v -> m [a]
+    listFromObject = mapM fromObject <=< getSequence
+
+    -- FIXME is this actually necesary?
+    mapFromObject :: (FromScalar k' k, MonadFail m)
+                  => Object k v
+                  -> m [(k', a)]
+    mapFromObject =
+        mapM (runKleisli (Kleisli fromScalar *** Kleisli fromObject))
+         <=< getMapping
+
+-- Converting between different types of Objects
+instance (ToScalar k k', ToScalar v v') => ToObject (Object k v) k' v' where
+    toObject = mapKeysValues toScalar toScalar
+
+instance (FromScalar k k', FromScalar v v')
+  => FromObject (Object k v) k' v' where
+    fromObject = mapKeysValuesM fromScalar fromScalar
+
+{- FIXME causes too much overlapping
+-- Special To/FromScalar => To/FromObject instances
+instance ToScalar x y => ToObject x k y where
+    toObject = Scalar . toScalar
+instance FromScalar x y => FromObject x k y where
+    fromObject = fromScalar <=< getScalar
+-}
+
+-- Sequence
+instance ToObject a k v => ToObject [a] k v where
+    toObject = listToObject
+instance FromObject a k v => FromObject [a] k v where
+    fromObject = listFromObject
+
+-- Mapping
+newtype Assoc k v = Assoc { unAssoc :: [(k, v)] }
+    deriving (Eq, Show)
+instance (ToObject a k v, ToScalar k' k)
+  => ToObject (Assoc k' a) k v where
+    toObject = mapToObject . unAssoc
+instance (FromObject a k v, FromScalar k' k)
+  => FromObject (Assoc k' a) k v where
+    fromObject = fmap Assoc . mapFromObject
+
+instance (ToScalar k k', ToObject v k' v') => ToObject (k, v) k' v' where
+    toObject = listToObject . return
+    listToObject = Mapping . map (toScalar *** toObject)
+instance (FromScalar k k', FromObject v k' v') => FromObject (k, v) k' v' where
+    fromObject o = do
+        ms <- listFromObject o
+        case ms of
+            [m] -> return m
+            _ -> fail "fromObject of pair requires mapping of size 1"
+    listFromObject =
+        mapM (runKleisli (Kleisli fromScalar *** Kleisli fromObject))
+        <=< getMapping

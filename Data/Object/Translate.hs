@@ -1,5 +1,4 @@
 {-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE TypeSynonymInstances #-}
 ---------------------------------------------------------
 --
 -- Module        : Data.Object.Translate
@@ -28,7 +27,6 @@ module Data.Object.Translate
 
 import Data.Maybe (fromMaybe)
 import Data.Object
-import Data.Object.String
 
 -- | Should usually be the well established I18N translation code. Examples
 -- include en, en_US, es, and so on. If you use these common codes, you will
@@ -66,15 +64,12 @@ class CanTranslate a where
 instance CanTranslate [Char] where
     translate = const
 
-translateObject :: FromStringObject fso
-                => [Language]
+translateObject :: [Language]
                 -> TranslateObject
-                -> fso
-translateObject langs = fromStringObject . fmap ($ langs)
+                -> Object String String
+translateObject langs = fmap ($ langs)
 
-translateKeyObject :: FromStringObject fso
-                   => [Language]
+translateKeyObject :: [Language]
                    -> TranslateKeyObject
-                   -> fso
-translateKeyObject langs =
-    fromStringObject . mapKeysValues ($ langs) ($ langs)
+                   -> Object String String
+translateKeyObject langs = mapKeysValues ($ langs) ($ langs)

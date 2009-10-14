@@ -1,3 +1,4 @@
+{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE FlexibleInstances #-}
 ---------------------------------------------------------
 --
@@ -16,12 +17,8 @@
 ---------------------------------------------------------
 module Data.Object.Raw
     ( RawObject
-    , FromRawObject (..)
-    , ToRawObject (..)
-    , FromRaw (..)
-    , ToRaw (..)
+    , Raw (..)
     , oLookup
-    , module Data.Object
     ) where
 
 import Data.Object
@@ -31,127 +28,105 @@ import Data.ByteString.Class
 import Data.Time.Calendar
 import Safe (readMay)
 import Control.Monad ((<=<))
-import Control.Arrow
 
 newtype Raw = Raw { unRaw :: B.ByteString }
 
 type RawObject = Object Raw Raw
 
-class ToRaw a where
-    toRaw :: a -> Raw
-class FromRaw a where
-    fromRaw :: MonadFail m => Raw -> m a
+{- FIXME
+class ToObject a where
+    toObject :: a -> RawObject
 
-class ToRawObject a where
-    toRawObject :: a -> RawObject
+    listToObject :: [a] -> RawObject
+    listToObject = Sequence . map toObject
 
-    listToRawObject :: [a] -> RawObject
-    listToRawObject = Sequence . map toRawObject
+    mapToObject :: ToScalar k => [(k, a)] -> RawObject
+    mapToObject = Mapping . map (toScalar *** toObject)
 
-    mapToRawObject :: ToRaw k => [(k, a)] -> RawObject
-    mapToRawObject = Mapping . map (toRaw *** toRawObject)
+class FromObject a where
+    fromObject :: MonadFail m => RawObject -> m a
 
-class FromRawObject a where
-    fromRawObject :: MonadFail m => RawObject -> m a
+    listFromObject :: MonadFail m => RawObject -> m [a]
+    listFromObject = mapM fromObject <=< getSequence
 
-    listFromRawObject :: MonadFail m => RawObject -> m [a]
-    listFromRawObject = mapM fromRawObject <=< getSequence
-
-    mapFromRawObject :: (FromRaw k, MonadFail m) => RawObject -> m [(k, a)]
-    mapFromRawObject =
-        mapM (runKleisli (Kleisli fromRaw *** Kleisli fromRawObject))
+    mapFromObject :: (FromScalar k, MonadFail m) => RawObject -> m [(k, a)]
+    mapFromObject =
+        mapM (runKleisli (Kleisli fromScalar *** Kleisli fromObject))
          <=< getMapping
+-}
 
-oLookup :: (MonadFail m, Eq a, Show a, FromRawObject b)
+oLookup :: (MonadFail m, Eq a, Show a, FromObject b k v)
         => a -- ^ key
-        -> [(a, RawObject)]
+        -> [(a, Object k v)]
         -> m b
 oLookup key pairs =
     case lookup key pairs of
         Nothing -> fail $ "Key not found: " ++ show key
-        Just x -> fromRawObject x
-
--- special list instance
-instance ToRawObject a => ToRawObject [a] where
-    toRawObject = listToRawObject
-instance FromRawObject a => FromRawObject [a] where
-    fromRawObject = listFromRawObject
-
--- special map instance
-instance (ToRaw k, ToRawObject v) => ToRawObject [(k, v)] where
-    toRawObject = mapToRawObject
-instance (FromRaw k, FromRawObject v) => FromRawObject [(k, v)] where
-    fromRawObject = mapFromRawObject
+        Just x -> fromObject x
 
 -- Raw instances
-instance ToRaw Raw where
-    toRaw = id
-instance FromRaw Raw where
-    fromRaw = return
-instance ToRawObject Raw where
-    toRawObject = Scalar
-instance FromRawObject Raw where
-    fromRawObject = getScalar
+instance ToScalar Raw Raw where
+    toScalar = id
+instance FromScalar Raw Raw where
+    fromScalar = return
+instance ToObject Raw a Raw where
+    toObject = Scalar
+instance FromObject Raw a Raw where
+    fromObject = getScalar
 
 -- lazy bytestrings
-instance ToRaw B.ByteString where
-    toRaw = Raw
-instance FromRaw B.ByteString where
-    fromRaw = return . unRaw
-instance ToRawObject B.ByteString where
-    toRawObject = Scalar . Raw
-instance FromRawObject B.ByteString where
-    fromRawObject = fmap unRaw . getScalar
+instance ToScalar B.ByteString Raw where
+    toScalar = Raw
+instance FromScalar B.ByteString Raw where
+    fromScalar = return . unRaw
+instance ToObject B.ByteString a Raw where
+    toObject = Scalar . Raw
+instance FromObject B.ByteString a Raw where
+    fromObject = fmap unRaw . getScalar
 
 -- strict bytestrings
-instance ToRaw BS.ByteString where
-    toRaw = Raw . toLazyByteString
-instance FromRaw BS.ByteString where
-    fromRaw = return . fromLazyByteString . unRaw
-instance ToRawObject BS.ByteString where
-    toRawObject = Scalar . toRaw
-instance FromRawObject BS.ByteString where
-    fromRawObject = fmap (fromLazyByteString . unRaw) . getScalar
+instance ToScalar BS.ByteString Raw where
+    toScalar = Raw . toLazyByteString
+instance FromScalar BS.ByteString Raw where
+    fromScalar = return . fromLazyByteString . unRaw
+instance ToObject BS.ByteString a Raw where
+    toObject = Scalar . toScalar
+instance FromObject BS.ByteString a Raw where
+    fromObject = fmap (fromLazyByteString . unRaw) . getScalar
 
 -- Chars (and thereby strings)
 -- Extra complication since we're avoiding overlapping instances.
 class ListToRaw a where
     listToRaw :: [a] -> Raw
-instance ListToRaw a => ToRaw [a] where
-    toRaw = listToRaw
+instance ListToRaw a => ToScalar [a] Raw where
+    toScalar = listToRaw
 instance ListToRaw Char where
     listToRaw = Raw . toLazyByteString
 
 class ListFromRaw a where
     listFromRaw :: MonadFail m => Raw -> m [a]
-instance ListFromRaw a => FromRaw [a] where
-    fromRaw = listFromRaw
+instance ListFromRaw a => FromScalar [a] Raw where
+    fromScalar = listFromRaw
 instance ListFromRaw Char where
     listFromRaw = return . fromLazyByteString . unRaw
 
-instance ToRawObject Char where
-    toRawObject c = Scalar $ Raw $ toLazyByteString $ [c]
-    listToRawObject = Scalar . Raw . toLazyByteString
-instance FromRawObject Char where
-    fromRawObject = helper . fromLazyByteString . unRaw <=< getScalar where
+instance ToObject Char Raw Raw where
+    toObject c = Scalar $ Raw $ toLazyByteString $ [c]
+    listToObject = Scalar . Raw . toLazyByteString
+instance FromObject Char Raw Raw where
+    fromObject = helper . fromLazyByteString . unRaw <=< getScalar where
         helper :: MonadFail m => String -> m Char
         helper [x] = return x
         helper x = fail $ "Excepting a single character, received: " ++ x
-    listFromRawObject = fmap (fromLazyByteString . unRaw) . getScalar
-
--- Objects
-instance (ToRaw k, ToRaw v) => ToRawObject (Object k v) where
-    toRawObject = mapKeysValues toRaw toRaw
-instance (FromRaw k, FromRaw v) => FromRawObject (Object k v) where
-    fromRawObject = mapKeysValuesM fromRaw fromRaw
+    listFromObject = fmap (fromLazyByteString . unRaw) . getScalar
 
 -- Day
-instance ToRaw Day where
-    toRaw = Raw . toLazyByteString . show
-instance ToRawObject Day where
-    toRawObject = Scalar . toRaw
-instance FromRaw Day where
-    fromRaw (Raw bs) = do
+instance ToScalar Day Raw where
+    toScalar = Raw . toLazyByteString . show
+instance ToObject Day k Raw where
+    toObject = Scalar . toScalar
+instance FromScalar Day Raw where
+    fromScalar (Raw bs) = do
         let s = fromLazyByteString bs
         if length s /= 10
             then fail ("Invalid day: " ++ s)
@@ -164,33 +139,33 @@ instance FromRaw Day where
                 case x of
                     Just (y, m, d) -> return $ fromGregorian y m d
                     Nothing -> fail $ "Invalid day: " ++ s
-instance FromRawObject Day where
-    fromRawObject = fromRaw <=< getScalar
+instance FromObject Day k Raw where
+    fromObject = fromScalar <=< getScalar
 
 -- Bool
-instance ToRaw Bool where
-    toRaw b = Raw $ toLazyByteString $ if b then "true" else "false"
-instance ToRawObject Bool where
-    toRawObject = Scalar . toRaw
-instance FromRaw Bool where
-    fromRaw (Raw bs) =
+instance ToScalar Bool Raw where
+    toScalar b = Raw $ toLazyByteString $ if b then "true" else "false"
+instance ToObject Bool k Raw where
+    toObject = Scalar . toScalar
+instance FromScalar Bool Raw where
+    fromScalar (Raw bs) =
         case fromLazyByteString bs of -- FIXME add other values here
                                       -- maybe be case insensitive
             "true" -> return True
             "false" -> return False
             x -> fail $ "Invalid bool value: " ++ x
-instance FromRawObject Bool where
-    fromRawObject = fromRaw <=< getScalar
+instance FromObject Bool k Raw where
+    fromObject = fromScalar <=< getScalar
 
 -- Int
-instance ToRaw Int where
-    toRaw = Raw . toLazyByteString . show
-instance ToRawObject Int where
-    toRawObject = Scalar . toRaw
-instance FromRaw Int where
-    fromRaw (Raw bs) =
+instance ToScalar Int Raw where
+    toScalar = Raw . toLazyByteString . show
+instance ToObject Int k Raw where
+    toObject = Scalar . toScalar
+instance FromScalar Int Raw where
+    fromScalar (Raw bs) =
         case readMay $ fromLazyByteString bs of
             Nothing -> fail $ "Invalid integer: " ++ fromLazyByteString bs
             Just i -> return i
-instance FromRawObject Int where
-    fromRawObject = fromRaw <=< getScalar
+instance FromObject Int k Raw where
+    fromObject = fromScalar <=< getScalar

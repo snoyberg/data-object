@@ -24,8 +24,7 @@ library
                      safe,
                      old-locale >= 1
     exposed-modules: Data.Object
-                     Data.Scalar
                      Data.Object.Raw
-                     Data.Object.String
+                     Data.Object.Scalar
                      Data.Object.Translate
     ghc-options:     -Wall
