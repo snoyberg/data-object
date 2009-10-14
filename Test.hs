@@ -1,9 +1,8 @@
 {-# LANGUAGE FlexibleInstances #-}
-import Test.Framework (defaultMain)
 
 import Data.Object
 
-import Test.Framework (testGroup, Test)
+import Test.Framework (defaultMain, testGroup, Test)
 --import Test.Framework.Providers.HUnit
 import Test.Framework.Providers.QuickCheck (testProperty)
 --import Test.HUnit hiding (Test)
