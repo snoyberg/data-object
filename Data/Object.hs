@@ -90,7 +90,7 @@ mapKeysValuesM _ fv (Scalar v) = Scalar <$> fv v
 mapKeysValuesM fk fv (Sequence os)=
     Sequence <$> mapM (mapKeysValuesM fk fv) os
 mapKeysValuesM fk fv (Mapping pairs) =
-    Mapping <$> mapM (liftPair . (fk *** mapKeysValuesM fk fv)) pairs
+    Mapping <$> mapM (uncurry (liftM2 (,)) . (fk *** mapKeysValuesM fk fv)) pairs
 
 propMapKeysValuesId :: Object Int Int -> Bool
 propMapKeysValuesId o = mapKeysValues id id o == o
@@ -150,7 +150,7 @@ instance (ToRaw bs, ToRawObject o) => ToRawObject [(bs, o)] where
     toRawObject = Mapping . map (toRaw *** toRawObject)
 instance (FromRaw bs, FromRawObject o) => FromRawObject [(bs, o)] where
     fromRawObject (Mapping pairs) =
-        mapM (liftPair . (fromRaw *** fromRawObject)) pairs
+        mapM (uncurry (liftM2 (,)) . (fromRaw *** fromRawObject)) pairs
     fromRawObject _ = fail "Attempt to extract a mapping from non-mapping"
 
 instance ToRawObject RawObject where
@@ -165,9 +165,6 @@ instance (FromRaw key, FromRaw value) => FromRawObject (Object key value) where
 
 propToFromRawObject :: Object Int Int -> Bool
 propToFromRawObject o = fromRawObject (toRawObject o) == Just o
-
-liftPair :: Monad m => (m a, m b) -> m (a, b)
-liftPair = uncurry $ liftM2 (,)
 
 oLookup :: (MonadFail m, Eq a, Show a, FromRawObject b)
         => a -- ^ key
@@ -249,14 +246,15 @@ instance Foldable (Object key) where
 
 instance Traversable (Object key) where
     traverse f (Scalar v) = Scalar <$> f v
-    traverse f (Sequence vs) =
-        Sequence <$> traverse (traverse f) vs
+    traverse f (Sequence vs) = Sequence <$> traverse (traverse f) vs
     traverse f (Mapping pairs) =
-        let helper (x, y') = pure ((,) x) <*> y'
-         in Mapping <$> traverse (helper . second (traverse f)) pairs
+      Mapping <$> traverse (traverse' (traverse f)) pairs
 
--- from Nicolas Pouillard, I'm not smart enough to come up with this on
--- my own
+-- It would be nice if there were an "instance Traversable ((,) a)", but I
+-- won't make an orphan instance for convenience. Instead:
+traverse' :: Applicative f => (a -> f b) -> (x, a) -> f (x, b)
+traverse' f (x, a) = (,) x <$> f a
+
 joinObj :: Object key (Object key scalar) -> Object key scalar
 joinObj (Scalar x)    = x
 joinObj (Sequence xs) = Sequence (map joinObj xs)
