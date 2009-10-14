@@ -20,11 +20,11 @@ instance ToRawObject Scalar where
 
 instance ToRaw Scalar where
     toRaw (Numeric n) = toRaw $ show n
-    toRaw (Text t) = encodeUtf8 t
-    toRaw (Binary b) = b
+    toRaw (Text t) = toRaw $ encodeUtf8 t
+    toRaw (Binary b) = toRaw b
     toRaw (Bool True) = toRaw "true"
     toRaw (Bool False) = toRaw "false"
     -- this is W3 format for timestamps.
     toRaw (Timestamp t) =
         toRaw $ formatTime defaultTimeLocale "%FT%XZ" t
-    toRaw Null = empty
+    toRaw Null = toRaw empty
