@@ -32,7 +32,7 @@ import qualified Data.ByteString as BS
 import Data.ByteString.Class
 import Data.Time.Calendar
 import Safe (readMay)
-import Control.Monad (liftM2)
+import Control.Monad ((<=<))
 import Control.Arrow
 
 type Raw = B.ByteString
@@ -49,10 +49,6 @@ class ToRawObject a => ToRaw a where
 class FromRawObject a => FromRaw a where
     fromRaw :: MonadFail m => B.ByteString -> m a
 
-rawFromRawObject :: MonadFail m => RawObject -> m Raw
-rawFromRawObject (Scalar s) = return s
-rawFromRawObject _ = fail "Attempt to extract a scalar from non-scalar"
-
 instance ToRaw Raw where
     toRaw = id
 instance FromRaw Raw where
@@ -60,7 +56,7 @@ instance FromRaw Raw where
 instance ToRawObject Raw where
     toRawObject = Scalar
 instance FromRawObject Raw where
-    fromRawObject = rawFromRawObject
+    fromRawObject = getScalar
 
 instance ToRaw BS.ByteString where
     toRaw = toLazyByteString
@@ -83,15 +79,14 @@ instance FromRawObject String where
 instance ToRawObject o => ToRawObject [o] where
     toRawObject = Sequence . map toRawObject
 instance FromRawObject o => FromRawObject [o] where
-    fromRawObject (Sequence os) = mapM fromRawObject os
-    fromRawObject _ = fail "Attempt to extract a sequence from non-sequence"
+    fromRawObject = mapM fromRawObject <=< getSequence
 
 instance (ToRaw bs, ToRawObject o) => ToRawObject [(bs, o)] where
     toRawObject = Mapping . map (toRaw *** toRawObject)
 instance (FromRaw bs, FromRawObject o) => FromRawObject [(bs, o)] where
-    fromRawObject (Mapping pairs) =
-        mapM (uncurry (liftM2 (,)) . (fromRaw *** fromRawObject)) pairs
-    fromRawObject _ = fail "Attempt to extract a mapping from non-mapping"
+    fromRawObject =
+        mapM (runKleisli (Kleisli fromRaw *** Kleisli fromRawObject))
+         <=< getMapping
 
 instance ToRawObject RawObject where
     toRawObject = id

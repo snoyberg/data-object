@@ -21,6 +21,9 @@ module Data.Object
     , mapKeysValues
     , mapKeysValuesM
     , MonadFail
+    , getScalar
+    , getSequence
+    , getMapping
     ) where
 
 import Control.Arrow
@@ -103,3 +106,15 @@ instance Monad (Object key) where
 instance Applicative (Object key) where
     pure  = Scalar
     (<*>) = ap
+
+getScalar :: MonadFail m => Object k v -> m v
+getScalar (Scalar s) = return s
+getScalar _ = fail "Attempt to extract a scalar from non-scalar"
+
+getSequence :: MonadFail m => Object k v -> m [Object k v]
+getSequence (Sequence s) = return s
+getSequence _ = fail "Attempt to extract a sequence from non-sequence"
+
+getMapping :: MonadFail m => Object k v -> m [(k, Object k v)]
+getMapping (Mapping m) = return m
+getMapping _ = fail "Attempt to extract a mapping from non-mapping"
