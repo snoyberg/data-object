@@ -29,7 +29,6 @@ module Data.Object
     , ToRaw (..)
     , oLookup
     , MonadFail
-    , testSuite
     ) where
 
 import qualified Data.ByteString.Lazy as B
@@ -46,12 +45,6 @@ import Prelude hiding (mapM, sequence)
 import Data.Foldable
 import Data.Traversable
 import Data.Monoid
-
-import Test.Framework (testGroup, Test)
---import Test.Framework.Providers.HUnit
-import Test.Framework.Providers.QuickCheck (testProperty)
---import Test.HUnit hiding (Test)
-import Test.QuickCheck
 
 class (Functor m, Applicative m, Monad m) => MonadFail m where
 
@@ -91,9 +84,6 @@ mapKeysValuesM fk fv (Sequence os)=
     Sequence <$> mapM (mapKeysValuesM fk fv) os
 mapKeysValuesM fk fv (Mapping pairs) =
     Mapping <$> mapM (uncurry (liftM2 (,)) . (fk *** mapKeysValuesM fk fv)) pairs
-
-propMapKeysValuesId :: Object Int Int -> Bool
-propMapKeysValuesId o = mapKeysValues id id o == o
 
 type Raw = B.ByteString
 
@@ -163,9 +153,6 @@ instance (ToRaw key, ToRaw value) => ToRawObject (Object key value) where
 instance (FromRaw key, FromRaw value) => FromRawObject (Object key value) where
     fromRawObject = mapKeysValuesM fromRaw fromRaw
 
-propToFromRawObject :: Object Int Int -> Bool
-propToFromRawObject o = fromRawObject (toRawObject o) == Just o
-
 oLookup :: (MonadFail m, Eq a, Show a, FromRawObject b)
         => a -- ^ key
         -> [(a, RawObject)]
@@ -222,19 +209,6 @@ instance FromRaw Int where
             Just i -> return i
 instance FromRawObject Int where
     fromRawObject o = fromRawObject o >>= fromRaw
-
-testSuite :: Test
-testSuite = testGroup "Data.Object"
-    [ testProperty "propMapKeysValuesId" propMapKeysValuesId
-    , testProperty "propToFromRawObject" propToFromRawObject
-    ]
-
-instance Arbitrary (Object Int Int) where
-    coarbitrary = undefined
-    arbitrary = oneof [arbS, arbL, arbM] where
-        arbS = Scalar `fmap` (arbitrary :: Gen Int)
-        arbL = Sequence `fmap` vector 2
-        arbM = Mapping `fmap` vector 1
 
 instance Functor (Object key) where
     fmap = mapValues
