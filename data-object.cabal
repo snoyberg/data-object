@@ -26,4 +26,6 @@ library
     exposed-modules: Data.Object
                      Data.Scalar
                      Data.Object.Raw
+                     Data.Object.String
+                     Data.Object.Translate
     ghc-options:     -Wall
