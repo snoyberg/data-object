@@ -31,6 +31,7 @@ module Data.Object
     , ToObject (..)
     , FromObject (..)
     , Assoc (..) -- FIXME consider removing this again
+    , oLookup
     ) where
 
 import Control.Arrow
@@ -126,6 +127,15 @@ getMapping :: MonadFail m => Object k v -> m [(k, Object k v)]
 getMapping (Mapping m) = return m
 getMapping _ = fail "Attempt to extract a mapping from non-mapping"
 
+oLookup :: (ToScalar a' a, MonadFail m, Eq a, Show a', FromObject b k v)
+        => a' -- ^ key
+        -> [(a, Object k v)]
+        -> m b
+oLookup key pairs =
+    case lookup (toScalar key) pairs of
+        Nothing -> fail $ "Key not found: " ++ show key
+        Just x -> fromObject x
+
 class ToScalar x y where
     toScalar :: x -> y
 class FromScalar x y where
@@ -153,6 +163,10 @@ class FromObject a k v where
     mapFromObject =
         mapM (runKleisli (Kleisli fromScalar *** Kleisli fromObject))
          <=< getMapping
+
+-- Identities for To/FromScalar
+instance ToScalar k k where toScalar = id
+instance FromScalar k k where fromScalar = return
 
 -- Converting between different types of Objects
 instance (ToScalar k k', ToScalar v v') => ToObject (Object k v) k' v' where

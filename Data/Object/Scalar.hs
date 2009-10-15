@@ -1,7 +1,10 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE FlexibleContexts #-}
 module Data.Object.Scalar
     ( Scalar (..)
     , ScalarObject
+    , toScalarObject
+    , fromScalarObject
     ) where
 
 import Data.ByteString.Lazy (ByteString, empty)
@@ -32,3 +35,13 @@ instance ToScalar Scalar Raw where
     toScalar (Timestamp t) =
         toScalar $ formatTime defaultTimeLocale "%FT%XZ" t
     toScalar Null = toScalar empty
+
+-- | 'toObject' specialized for 'ScalarObject's
+toScalarObject :: ToObject a String Scalar => a -> ScalarObject
+toScalarObject = toObject
+
+-- | 'fomObject' specialized for 'ScalarObject's
+fromScalarObject :: (MonadFail m, FromObject a String Scalar)
+                 => ScalarObject
+                 -> m a
+fromScalarObject = fromObject

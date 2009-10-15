@@ -1,5 +1,6 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE FlexibleContexts #-}
 ---------------------------------------------------------
 --
 -- Module        : Data.Object.Raw
@@ -19,6 +20,8 @@ module Data.Object.Raw
     ( RawObject
     , Raw (..)
     , oLookup
+    , toRawObject
+    , fromRawObject
     ) where
 
 import Data.Object
@@ -30,45 +33,11 @@ import Safe (readMay)
 import Control.Monad ((<=<))
 
 newtype Raw = Raw { unRaw :: B.ByteString }
+    deriving (Eq)
 
 type RawObject = Object Raw Raw
 
-{- FIXME
-class ToObject a where
-    toObject :: a -> RawObject
-
-    listToObject :: [a] -> RawObject
-    listToObject = Sequence . map toObject
-
-    mapToObject :: ToScalar k => [(k, a)] -> RawObject
-    mapToObject = Mapping . map (toScalar *** toObject)
-
-class FromObject a where
-    fromObject :: MonadFail m => RawObject -> m a
-
-    listFromObject :: MonadFail m => RawObject -> m [a]
-    listFromObject = mapM fromObject <=< getSequence
-
-    mapFromObject :: (FromScalar k, MonadFail m) => RawObject -> m [(k, a)]
-    mapFromObject =
-        mapM (runKleisli (Kleisli fromScalar *** Kleisli fromObject))
-         <=< getMapping
--}
-
-oLookup :: (MonadFail m, Eq a, Show a, FromObject b k v)
-        => a -- ^ key
-        -> [(a, Object k v)]
-        -> m b
-oLookup key pairs =
-    case lookup key pairs of
-        Nothing -> fail $ "Key not found: " ++ show key
-        Just x -> fromObject x
-
 -- Raw instances
-instance ToScalar Raw Raw where
-    toScalar = id
-instance FromScalar Raw Raw where
-    fromScalar = return
 instance ToObject Raw a Raw where
     toObject = Scalar
 instance FromObject Raw a Raw where
@@ -169,3 +138,11 @@ instance FromScalar Int Raw where
             Just i -> return i
 instance FromObject Int k Raw where
     fromObject = fromScalar <=< getScalar
+
+-- | 'toObject' specialized for 'RawObject's
+toRawObject :: ToObject a Raw Raw => a -> RawObject
+toRawObject = toObject
+
+-- | 'fomObject' specialized for 'RawObject's
+fromRawObject :: (MonadFail m, FromObject a Raw Raw) => RawObject -> m a
+fromRawObject = fromObject

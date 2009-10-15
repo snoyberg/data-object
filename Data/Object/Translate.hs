@@ -1,4 +1,5 @@
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE FlexibleContexts #-}
 ---------------------------------------------------------
 --
 -- Module        : Data.Object.Translate
@@ -19,10 +20,13 @@ module Data.Object.Translate
     , TranslateObject
     , TranslateKeyObject
       -- * Type classes
-    , CanTranslate
+    , CanTranslate (..)
       -- * Utilities for objects
     , translateObject
     , translateKeyObject
+      -- * Specialized functions
+    , toTranslateObject
+    , fromTranslateObject
     ) where
 
 import Data.Maybe (fromMaybe)
@@ -73,3 +77,13 @@ translateKeyObject :: [Language]
                    -> TranslateKeyObject
                    -> Object String String
 translateKeyObject langs = mapKeysValues ($ langs) ($ langs)
+
+-- | 'toObject' specialized for 'TranslateObject's
+toTranslateObject :: ToObject a String Translator => a -> TranslateObject
+toTranslateObject = toObject
+
+-- | 'fomObject' specialized for 'TranslateObject's
+fromTranslateObject :: (MonadFail m, FromObject a String Translator)
+                    => TranslateObject
+                    -> m a
+fromTranslateObject = fromObject
