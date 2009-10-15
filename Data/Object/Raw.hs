@@ -11,16 +11,15 @@
 -- Stability     : Stable
 -- Portability   : portable
 --
--- Objects with bytestrings for keys and values. This also includes some nice
--- utilities for converting to/from these.
---
--- This is especially useful for serializing to/from files like JSON and Yaml.
+-- Objects with bytestrings for keys and values. This is especially useful for
+-- serializing to/from files like JSON and Yaml.
 ---------------------------------------------------------
 module Data.Object.Raw
-    ( RawObject
-    , Raw (..)
+    ( Raw (..)
+    , RawObject
     , toRawObject
     , fromRawObject
+    , lookupRawObject
     ) where
 
 import Data.Object
@@ -31,16 +30,12 @@ import Data.Time.Calendar
 import Safe (readMay)
 import Control.Monad ((<=<))
 
+-- | A thin wrapper around a lazy bytestring.
 newtype Raw = Raw { unRaw :: B.ByteString }
     deriving (Eq)
 
+-- | 'Object's with keys and values of type 'Raw'.
 type RawObject = Object Raw Raw
-
--- Raw instances
-instance ToObject Raw a Raw where
-    toObject = Scalar
-instance FromObject Raw a Raw where
-    fromObject = getScalar
 
 -- lazy bytestrings
 instance ToScalar B.ByteString Raw where
@@ -48,9 +43,9 @@ instance ToScalar B.ByteString Raw where
 instance FromScalar B.ByteString Raw where
     fromScalar = return . unRaw
 instance ToObject B.ByteString a Raw where
-    toObject = Scalar . Raw
+    toObject = scalarToObject
 instance FromObject B.ByteString a Raw where
-    fromObject = fmap unRaw . getScalar
+    fromObject = scalarFromObject
 
 -- strict bytestrings
 instance ToScalar BS.ByteString Raw where
@@ -58,9 +53,9 @@ instance ToScalar BS.ByteString Raw where
 instance FromScalar BS.ByteString Raw where
     fromScalar = return . fromLazyByteString . unRaw
 instance ToObject BS.ByteString a Raw where
-    toObject = Scalar . toScalar
+    toObject = scalarToObject
 instance FromObject BS.ByteString a Raw where
-    fromObject = fmap (fromLazyByteString . unRaw) . getScalar
+    fromObject = scalarFromObject
 
 -- Chars (and thereby strings)
 -- Extra complication since we're avoiding overlapping instances.
@@ -92,7 +87,7 @@ instance FromObject Char Raw Raw where
 instance ToScalar Day Raw where
     toScalar = Raw . toLazyByteString . show
 instance ToObject Day k Raw where
-    toObject = Scalar . toScalar
+    toObject = scalarToObject
 instance FromScalar Day Raw where
     fromScalar (Raw bs) = do
         let s = fromLazyByteString bs
@@ -108,35 +103,60 @@ instance FromScalar Day Raw where
                     Just (y, m, d) -> return $ fromGregorian y m d
                     Nothing -> fail $ "Invalid day: " ++ s
 instance FromObject Day k Raw where
-    fromObject = fromScalar <=< getScalar
+    fromObject = scalarFromObject
 
 -- Bool
 instance ToScalar Bool Raw where
     toScalar b = Raw $ toLazyByteString $ if b then "true" else "false"
 instance ToObject Bool k Raw where
-    toObject = Scalar . toScalar
+    toObject = scalarToObject
 instance FromScalar Bool Raw where
     fromScalar (Raw bs) =
-        case fromLazyByteString bs of -- FIXME add other values here
-                                      -- maybe be case insensitive
+        case fromLazyByteString bs of
+            -- list comes from http://yaml.org/type/bool.html
+            --  y|Y|yes|Yes|YES|n|N|no|No|NO
+            -- |true|True|TRUE|false|False|FALSE
+            -- |on|On|ON|off|Off|OFF
+            "y" -> return True
+            "Y" -> return True
+            "yes" -> return True
+            "Yes" -> return True
+            "YES" -> return True
             "true" -> return True
+            "True" -> return True
+            "TRUE" -> return True
+            "on" -> return True
+            "On" -> return True
+            "ON" -> return True
+
+            "n" -> return False
+            "N" -> return False
+            "no" -> return False
+            "No" -> return False
+            "NO" -> return False
             "false" -> return False
+            "False" -> return False
+            "FALSE" -> return False
+            "off" -> return False
+            "Off" -> return False
+            "OFF" -> return False
+
             x -> fail $ "Invalid bool value: " ++ x
 instance FromObject Bool k Raw where
-    fromObject = fromScalar <=< getScalar
+    fromObject = scalarFromObject
 
 -- Int
 instance ToScalar Int Raw where
     toScalar = Raw . toLazyByteString . show
 instance ToObject Int k Raw where
-    toObject = Scalar . toScalar
+    toObject = scalarToObject
 instance FromScalar Int Raw where
     fromScalar (Raw bs) =
         case readMay $ fromLazyByteString bs of
             Nothing -> fail $ "Invalid integer: " ++ fromLazyByteString bs
             Just i -> return i
 instance FromObject Int k Raw where
-    fromObject = fromScalar <=< getScalar
+    fromObject = scalarFromObject
 
 -- | 'toObject' specialized for 'RawObject's
 toRawObject :: ToObject a Raw Raw => a -> RawObject
@@ -145,3 +165,14 @@ toRawObject = toObject
 -- | 'fomObject' specialized for 'RawObject's
 fromRawObject :: (MonadFail m, FromObject a Raw Raw) => RawObject -> m a
 fromRawObject = fromObject
+
+-- | 'lookupObject' specialized for 'RawObject's
+lookupRawObject :: ( MonadFail m
+                   , ToScalar k Raw
+                   , Show k
+                   , FromObject v Raw Raw
+                   )
+                => k
+                -> [(Raw, RawObject)]
+                -> m v
+lookupRawObject = lookupObject

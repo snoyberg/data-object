@@ -27,6 +27,7 @@ module Data.Object.Translate
       -- * Specialized functions
     , toTranslateObject
     , fromTranslateObject
+    , lookupTranslateObject
     ) where
 
 import Data.Maybe (fromMaybe)
@@ -68,11 +69,14 @@ class CanTranslate a where
 instance CanTranslate [Char] where
     translate = const
 
+-- | Generate an 'Object' 'String' 'String' with the translation of the
+-- original based on the language list supplied.
 translateObject :: [Language]
                 -> TranslateObject
                 -> Object String String
 translateObject langs = fmap ($ langs)
 
+-- | Same as 'translateObject', but translate the keys as well as the values.
 translateKeyObject :: [Language]
                    -> TranslateKeyObject
                    -> Object String String
@@ -87,3 +91,14 @@ fromTranslateObject :: (MonadFail m, FromObject a String Translator)
                     => TranslateObject
                     -> m a
 fromTranslateObject = fromObject
+
+-- | 'lookupObject' specialized for 'TranslateObject's
+lookupTranslateObject :: ( MonadFail m
+                         , ToScalar k String
+                         , Show k
+                         , FromObject v String Translator
+                         )
+                      => k
+                      -> [(String, TranslateObject)]
+                      -> m v
+lookupTranslateObject = lookupObject

@@ -1,10 +1,21 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE FlexibleContexts #-}
+---------------------------------------------------------
+--
+-- Module        : Data.Object.Scalar
+-- Copyright     : Michael Snoyman
+-- License       : BSD3
+--
+-- Maintainer    : Michael Snoyman <michael@snoyman.com>
+-- Stability     : Stable
+-- Portability   : portable
+---------------------------------------------------------
 module Data.Object.Scalar
     ( Scalar (..)
     , ScalarObject
     , toScalarObject
     , fromScalarObject
+    , lookupScalarObject
     ) where
 
 import Data.ByteString.Lazy (ByteString, empty)
@@ -45,3 +56,13 @@ fromScalarObject :: (MonadFail m, FromObject a String Scalar)
                  => ScalarObject
                  -> m a
 fromScalarObject = fromObject
+-- | 'lookupObject' specialized for 'ScalarObject's
+lookupScalarObject :: ( MonadFail m
+                      , ToScalar k String
+                      , Show k
+                      , FromObject v String Scalar
+                      )
+                   => k
+                   -> [(String, ScalarObject)]
+                   -> m v
+lookupScalarObject = lookupObject

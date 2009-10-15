@@ -17,6 +17,7 @@ module Data.Object.String
     ( StringObject
     , toStringObject
     , fromStringObject
+    , lookupStringObject
     ) where
 
 import Data.Object
@@ -32,3 +33,14 @@ fromStringObject :: (MonadFail m, FromObject a String String)
                  => StringObject
                  -> m a
 fromStringObject = fromObject
+
+-- | 'lookupObject' specialized for 'StringObject's
+lookupStringObject :: ( MonadFail m
+                      , ToScalar k String
+                      , Show k
+                      , FromObject v String String
+                      )
+                   => k
+                   -> [(String, StringObject)]
+                   -> m v
+lookupStringObject = lookupObject
