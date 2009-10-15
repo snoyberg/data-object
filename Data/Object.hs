@@ -1,5 +1,6 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE DeriveDataTypeable #-}
 ---------------------------------------------------------
 --
 -- Module        : Data.Object
@@ -44,6 +45,8 @@ import Data.Foldable
 import Data.Traversable
 import Data.Monoid
 
+import Data.Generics
+
 class (Functor m, Applicative m, Monad m) => MonadFail m where
 
 instance MonadFail IO where
@@ -54,7 +57,7 @@ data Object key val =
     Mapping [(key, Object key val)]
     | Sequence [Object key val]
     | Scalar val
-    deriving (Show, Eq)
+    deriving (Show, Eq, Data, Typeable)
 
 mapKeys :: (key1 -> key2) -> Object key1 val -> Object key2 val
 mapKeys = flip mapKeysValues id

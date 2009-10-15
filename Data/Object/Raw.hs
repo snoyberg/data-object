@@ -19,7 +19,6 @@
 module Data.Object.Raw
     ( RawObject
     , Raw (..)
-    , oLookup
     , toRawObject
     , fromRawObject
     ) where
