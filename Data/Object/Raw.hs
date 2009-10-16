@@ -74,7 +74,7 @@ instance ListFromRaw Char where
     listFromRaw = return . fromLazyByteString . unRaw
 
 instance ToObject Char Raw Raw where
-    toObject c = Scalar $ Raw $ toLazyByteString $ [c]
+    toObject c = Scalar $ Raw $ toLazyByteString [c]
     listToObject = Scalar . Raw . toLazyByteString
 instance FromObject Char Raw Raw where
     fromObject = helper . fromLazyByteString . unRaw <=< getScalar where
@@ -114,9 +114,6 @@ instance FromScalar Bool Raw where
     fromScalar (Raw bs) =
         case fromLazyByteString bs of
             -- list comes from http://yaml.org/type/bool.html
-            --  y|Y|yes|Yes|YES|n|N|no|No|NO
-            -- |true|True|TRUE|false|False|FALSE
-            -- |on|On|ON|off|Off|OFF
             "y" -> return True
             "Y" -> return True
             "yes" -> return True

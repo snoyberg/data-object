@@ -41,6 +41,7 @@ module Data.Object
       -- * Failure representation
     , MonadFail
     , Attempt (..)
+    , attemptToEither
       -- * Extracting underlying values
     , getScalar
     , getSequence
@@ -192,6 +193,16 @@ instance Monad Attempt where
     (Failure s) >>= _ = Failure s
 instance MonadFail Attempt where
 
+-- | 'Attempt' is really just another name for 'Either' 'String'. However, in
+-- order to use 'Either' 'String', we would have to create orphan instances of
+-- 'Either' 'String' for 'Applicative' and 'Monad', risking conflicts with
+-- other libraries (for example, mtl).
+--
+-- If you want to receive results in an 'Either', use this conversion function.
+attemptToEither :: Attempt v -> Either String v
+attemptToEither (Failure s) = Left s
+attemptToEither (Success v) = Right v
+
 -- | Extra a scalar from the input, failing if the input is a sequence or
 -- mapping.
 getScalar :: MonadFail m => Object k v -> m v
@@ -229,7 +240,7 @@ getMapping _ = fail "Attempt to extract a mapping from non-mapping"
 -- @
 --
 -- Obviously, if 'FromObject' received a value looking like (in JSON notation)
--- {name:\"John\",age:\"30\"}, the result should be Person \"John\"
+-- {name:\"John\",age:30}, the result should be Person \"John\"
 -- 30. However, what do you do with the value {foo:\"bar\"}? That's why the
 -- result of 'fromObject' is wrapped in a 'MonadFail'.
 --
@@ -281,7 +292,7 @@ class FromScalar x y where
 -- @
 --
 -- Then toObject [TestScore \"Abe\" 5, TestScore \"Bill\" 2] would produce, in
--- JSON format, {\"Abe\":\"5\",\"Bill\":\"2\"}.
+-- JSON format, {\"Abe\":5,\"Bill\":2}.
 --
 -- The purpose of showing these two versions of the implementation are to give
 -- an idea of the power of 'toObject'. Since many basic instances of 'ToObject'

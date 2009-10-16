@@ -52,8 +52,8 @@ type TranslateKeyObject = Object Translator Translator
 
 -- | Anything which can be translated into a different language.
 --
--- Minimal complete definition: translate or tryTranslate and
--- defaultTranslate.
+-- Minimal complete definition: translate or (tryTranslate and
+-- defaultTranslate).
 class CanTranslate a where
     translate :: a -> Translator
     translate a [] = defaultTranslate a
