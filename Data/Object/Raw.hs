@@ -29,6 +29,7 @@ import Data.ByteString.Class
 import Data.Time.Calendar
 import Safe (readMay)
 import Control.Monad ((<=<))
+import Data.Ratio (Ratio)
 
 -- | A thin wrapper around a lazy bytestring.
 newtype Raw = Raw { unRaw :: B.ByteString }
@@ -40,8 +41,12 @@ type RawObject = Object Raw Raw
 -- lazy bytestrings
 instance ToScalar B.ByteString Raw where
     toScalar = Raw
+instance ToScalar Raw B.ByteString where
+    toScalar = unRaw
 instance FromScalar B.ByteString Raw where
-    fromScalar = return . unRaw
+    fromScalar = return . toScalar
+instance FromScalar Raw B.ByteString where
+    fromScalar = return . toScalar
 instance ToObject B.ByteString a Raw where
     toObject = scalarToObject
 instance FromObject B.ByteString a Raw where
@@ -50,8 +55,12 @@ instance FromObject B.ByteString a Raw where
 -- strict bytestrings
 instance ToScalar BS.ByteString Raw where
     toScalar = Raw . toLazyByteString
+instance ToScalar Raw BS.ByteString where
+    toScalar = fromLazyByteString . unRaw
 instance FromScalar BS.ByteString Raw where
-    fromScalar = return . fromLazyByteString . unRaw
+    fromScalar = return . toScalar
+instance FromScalar Raw BS.ByteString where
+    fromScalar = return . toScalar
 instance ToObject BS.ByteString a Raw where
     toObject = scalarToObject
 instance FromObject BS.ByteString a Raw where
@@ -153,6 +162,19 @@ instance FromScalar Int Raw where
             Nothing -> fail $ "Invalid integer: " ++ fromLazyByteString bs
             Just i -> return i
 instance FromObject Int k Raw where
+    fromObject = scalarFromObject
+
+-- Rational
+instance ToScalar (Ratio Integer) Raw where
+    toScalar = Raw . toLazyByteString . show
+instance ToObject (Ratio Integer) k Raw where
+    toObject = scalarToObject
+instance FromScalar (Ratio Integer) Raw where
+    fromScalar (Raw bs) =
+        case readMay $ fromLazyByteString bs of
+            Nothing -> fail $ "Invalid rational: " ++ fromLazyByteString bs
+            Just i -> return i
+instance FromObject (Ratio Integer) k Raw where
     fromObject = scalarFromObject
 
 -- | 'toObject' specialized for 'RawObject's
