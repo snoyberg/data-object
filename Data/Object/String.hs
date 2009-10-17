@@ -21,6 +21,7 @@ module Data.Object.String
     ) where
 
 import Data.Object
+import Data.Attempt
 
 type StringObject = Object String String
 
@@ -29,18 +30,17 @@ toStringObject :: ToObject a String String => a -> StringObject
 toStringObject = toObject
 
 -- | 'fomObject' specialized for 'StringObject's
-fromStringObject :: (MonadFail m, FromObject a String String)
+fromStringObject :: (FromObject a String String)
                  => StringObject
-                 -> m a
+                 -> Attempt a
 fromStringObject = fromObject
 
 -- | 'lookupObject' specialized for 'StringObject's
-lookupStringObject :: ( MonadFail m
-                      , ToScalar k String
+lookupStringObject :: ( ToScalar k String
                       , Show k
                       , FromObject v String String
                       )
                    => k
                    -> [(String, StringObject)]
-                   -> m v
+                   -> Attempt v
 lookupStringObject = lookupObject

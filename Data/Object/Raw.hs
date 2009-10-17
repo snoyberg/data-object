@@ -30,6 +30,7 @@ import Data.Time.Calendar
 import Safe (readMay)
 import Control.Monad ((<=<))
 import Data.Ratio (Ratio)
+import Data.Attempt
 
 -- | A thin wrapper around a lazy bytestring.
 newtype Raw = Raw { unRaw :: B.ByteString }
@@ -76,7 +77,7 @@ instance ListToRaw Char where
     listToRaw = Raw . toLazyByteString
 
 class ListFromRaw a where
-    listFromRaw :: MonadFail m => Raw -> m [a]
+    listFromRaw :: Raw -> Attempt [a]
 instance ListFromRaw a => FromScalar [a] Raw where
     fromScalar = listFromRaw
 instance ListFromRaw Char where
@@ -87,7 +88,7 @@ instance ToObject Char Raw Raw where
     listToObject = Scalar . Raw . toLazyByteString
 instance FromObject Char Raw Raw where
     fromObject = helper . fromLazyByteString . unRaw <=< getScalar where
-        helper :: MonadFail m => String -> m Char
+        helper :: String -> Attempt Char
         helper [x] = return x
         helper x = fail $ "Excepting a single character, received: " ++ x
     listFromObject = fmap (fromLazyByteString . unRaw) . getScalar
@@ -182,16 +183,15 @@ toRawObject :: ToObject a Raw Raw => a -> RawObject
 toRawObject = toObject
 
 -- | 'fomObject' specialized for 'RawObject's
-fromRawObject :: (MonadFail m, FromObject a Raw Raw) => RawObject -> m a
+fromRawObject :: (FromObject a Raw Raw) => RawObject -> Attempt a
 fromRawObject = fromObject
 
 -- | 'lookupObject' specialized for 'RawObject's
-lookupRawObject :: ( MonadFail m
-                   , ToScalar k Raw
+lookupRawObject :: ( ToScalar k Raw
                    , Show k
                    , FromObject v Raw Raw
                    )
                 => k
                 -> [(Raw, RawObject)]
-                -> m v
+                -> Attempt v
 lookupRawObject = lookupObject

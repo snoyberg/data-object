@@ -32,6 +32,7 @@ module Data.Object.Translate
 
 import Data.Maybe (fromMaybe)
 import Data.Object
+import Data.Attempt
 
 -- | Should usually be the well established I18N translation code. Examples
 -- include en, en_US, es, and so on. If you use these common codes, you will
@@ -87,18 +88,17 @@ toTranslateObject :: ToObject a String Translator => a -> TranslateObject
 toTranslateObject = toObject
 
 -- | 'fomObject' specialized for 'TranslateObject's
-fromTranslateObject :: (MonadFail m, FromObject a String Translator)
+fromTranslateObject :: (FromObject a String Translator)
                     => TranslateObject
-                    -> m a
+                    -> Attempt a
 fromTranslateObject = fromObject
 
 -- | 'lookupObject' specialized for 'TranslateObject's
-lookupTranslateObject :: ( MonadFail m
-                         , ToScalar k String
+lookupTranslateObject :: ( ToScalar k String
                          , Show k
                          , FromObject v String Translator
                          )
                       => k
                       -> [(String, TranslateObject)]
-                      -> m v
+                      -> Attempt v
 lookupTranslateObject = lookupObject

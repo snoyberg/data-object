@@ -26,6 +26,7 @@ import Data.Object
 import Data.Object.Raw
 import System.Locale (defaultTimeLocale)
 import Data.Time.Format (formatTime)
+import Data.Attempt
 
 data Scalar = Numeric   Rational
             | Text      Text
@@ -52,17 +53,16 @@ toScalarObject :: ToObject a String Scalar => a -> ScalarObject
 toScalarObject = toObject
 
 -- | 'fomObject' specialized for 'ScalarObject's
-fromScalarObject :: (MonadFail m, FromObject a String Scalar)
+fromScalarObject :: (FromObject a String Scalar)
                  => ScalarObject
-                 -> m a
+                 -> Attempt a
 fromScalarObject = fromObject
 -- | 'lookupObject' specialized for 'ScalarObject's
-lookupScalarObject :: ( MonadFail m
-                      , ToScalar k String
+lookupScalarObject :: ( ToScalar k String
                       , Show k
                       , FromObject v String Scalar
                       )
                    => k
                    -> [(String, ScalarObject)]
-                   -> m v
+                   -> Attempt v
 lookupScalarObject = lookupObject

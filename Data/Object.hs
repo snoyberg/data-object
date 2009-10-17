@@ -38,10 +38,6 @@ module Data.Object
     , mapKeysValues
     , mapKeysValuesA
     , mapKeysValuesM
-      -- * Failure representation
-    , MonadFail
-    , Attempt (..)
-    , attemptToEither
       -- * Extracting underlying values
     , getScalar
     , getSequence
@@ -70,6 +66,7 @@ import Data.Traversable
 import Data.Monoid
 
 import Data.Generics
+import Data.Attempt
 
 -- | Can represent nested values as scalars, sequences and mappings.  A
 -- sequence is synonymous with a list, while a mapping is synonymous with a
@@ -161,63 +158,22 @@ mapKeysValuesM fk fv =
         fv' = WrapMonad . fv
      in unwrapMonad . mapKeysValuesA fk' fv'
 
--- | This class is merely a flag, stating that the 'fail' function on a given
--- 'Monad' is usable.
---
--- There's a lot of people who advise against using the 'fail' function, since
--- it is not really part of the monad laws. Failure should instead be signaled
--- by returning a 'Maybe' value, or 'Either' if some error description is used.
---
--- Instances of 'MonadFail' should all do \"the right thing\" when the 'fail' function is called. 'Maybe' should give 'Nothing', 'IO' should give a user error, etc. If you are looking for a good way to extra the error message, try 'Attempt'.
-class (Functor m, Applicative m, Monad m) => MonadFail m where
-
-instance MonadFail IO where
-instance MonadFail Maybe where
-instance MonadFail [] where
-
--- | Holds either a value or an error string.
-data Attempt v = Failure String | Success v
-    deriving (Eq, Show, Data, Typeable)
-instance Functor Attempt where
-    _ `fmap` (Failure s) = Failure s
-    f `fmap` (Success v) = Success $ f v
-instance Applicative Attempt where
-    pure = Success
-    (Success f) <*> (Success v) = Success $ f v
-    (Failure s) <*> _ = Failure s
-    _ <*> (Failure s) = Failure s
-instance Monad Attempt where
-    return = Success
-    fail = Failure
-    (Success v) >>= f = f v
-    (Failure s) >>= _ = Failure s
-instance MonadFail Attempt where
-
--- | 'Attempt' is really just another name for 'Either' 'String'. However, in
--- order to use 'Either' 'String', we would have to create orphan instances of
--- 'Either' 'String' for 'Applicative' and 'Monad', risking conflicts with
--- other libraries (for example, mtl).
---
--- If you want to receive results in an 'Either', use this conversion function.
-attemptToEither :: Attempt v -> Either String v
-attemptToEither (Failure s) = Left s
-attemptToEither (Success v) = Right v
-
+-- FIXME use an Exception type below?
 -- | Extra a scalar from the input, failing if the input is a sequence or
 -- mapping.
-getScalar :: MonadFail m => Object k v -> m v
+getScalar :: Object k v -> Attempt v
 getScalar (Scalar s) = return s
 getScalar _ = fail "Attempt to extract a scalar from non-scalar"
 
 -- | Extra a sequence from the input, failing if the input is a scalar or
 -- mapping.
-getSequence :: MonadFail m => Object k v -> m [Object k v]
+getSequence :: Object k v -> Attempt [Object k v]
 getSequence (Sequence s) = return s
 getSequence _ = fail "Attempt to extract a sequence from non-sequence"
 
 -- | Extra a mapping from the input, failing if the input is a scalar or
 -- sequence.
-getMapping :: MonadFail m => Object k v -> m [(k, Object k v)]
+getMapping :: Object k v -> Attempt [(k, Object k v)]
 getMapping (Mapping m) = return m
 getMapping _ = fail "Attempt to extract a mapping from non-mapping"
 
@@ -242,11 +198,11 @@ getMapping _ = fail "Attempt to extract a mapping from non-mapping"
 -- Obviously, if 'FromObject' received a value looking like (in JSON notation)
 -- {name:\"John\",age:30}, the result should be Person \"John\"
 -- 30. However, what do you do with the value {foo:\"bar\"}? That's why the
--- result of 'fromObject' is wrapped in a 'MonadFail'.
+-- result of 'fromObject' is wrapped in an 'Attempt'.
 --
 -- 'ToScalar' and 'FromScalar' then borrow the same terminology. Since
 -- 'ToScalar' is intended to be called by 'ToObject' instances, it needs to
--- guarantee success; thus no 'MonadFail' wrapper. 'FromScalar' simply allows a
+-- guarantee success; thus no 'Attempt' wrapper. 'FromScalar' simply allows a
 -- failure to occur. Using the example from above, if the value passed to
 -- fromObject was {name:\"John\",age:\"thirty\"}, the 'fromScalar' call on
 -- \"thirty\" should fail, saying that \"thirty\" cannot be converted to an
@@ -276,7 +232,7 @@ class ToScalar x y where
 --                  Just i -> return i
 -- @
 class FromScalar x y where
-    fromScalar :: MonadFail m => y -> m x
+    fromScalar :: y -> Attempt x
 
 -- | Something which can be converted from a to 'Object' k v with guaranteed
 -- success. A somewhat unusual but very simple example would be:
@@ -334,9 +290,8 @@ class ToObject a k v where
 --              pairs <- mapM getScalarFromSecond objectPairs
 --              return $ map testScoreFromPair pairs
 --              where
---                  getScalarFromSecond :: MonadFail m
---                                      => (k, Object k v)
---                                      -> m (k, v)
+--                  getScalarFromSecond :: (k, Object k v)
+--                                      -> Attempt (k, v)
 --                  getScalarFromSecond (k, v) = do
 --                      v' <- getScalar v
 --                      return (k, v')
@@ -374,15 +329,15 @@ class ToObject a k v where
 --
 -- Minimal complete definition: 'fromObject'.
 class FromObject a k v where
-    fromObject :: MonadFail m => Object k v -> m a
+    fromObject :: Object k v -> Attempt a
 
-    listFromObject :: MonadFail m => Object k v -> m [a]
+    listFromObject :: Object k v -> Attempt [a]
     listFromObject = mapM fromObject <=< getSequence
 
     -- FIXME is this actually necesary?
-    mapFromObject :: (FromScalar k' k, MonadFail m)
+    mapFromObject :: (FromScalar k' k)
                   => Object k v
-                  -> m [(k', a)]
+                  -> Attempt [(k', a)]
     mapFromObject =
         mapM (runKleisli (Kleisli fromScalar *** Kleisli fromObject))
          <=< getMapping
@@ -431,18 +386,18 @@ instance (FromScalar k k', FromObject v k' v') => FromObject (k, v) k' v' where
 -- you have the appropriate 'ToScalar' instances, you could lookup an 'Int' in
 -- a map that has 'String' keys.
 --
--- 2. Return the result in any 'MonadFail', not just 'Maybe'. This is
--- especially useful when creating 'FromObject' instances.
+-- 2. Return the result in an 'Attempt', not 'Maybe'. This is especially useful
+-- when creating 'FromObject' instances.
 --
 -- 3. Show a more useful error message. Since this function requires the key to
 -- be 'Show'able, the fail message states what key was not found.
 --
 -- 4. Calls 'fromObject' automatically, so you get out the value type that you
 -- want, not just an 'Object'.
-lookupObject :: (ToScalar a' a, MonadFail m, Eq a, Show a', FromObject b k v)
+lookupObject :: (ToScalar a' a, Eq a, Show a', FromObject b k v)
              => a' -- ^ key
              -> [(a, Object k v)] -- ^ map
-             -> m b
+             -> Attempt b
 lookupObject key pairs =
     case lookup (toScalar key) pairs of
         Nothing -> fail $ "Key not found: " ++ show key
@@ -462,5 +417,5 @@ scalarToObject = Scalar . toScalar
 
 -- | An appropriate 'fromObject' function for any types x and y which have a
 -- 'FromScalar' x y instance.
-scalarFromObject :: (MonadFail m, FromScalar x y) => Object k y -> m x
+scalarFromObject :: FromScalar x y => Object k y -> Attempt x
 scalarFromObject = fromScalar <=< getScalar

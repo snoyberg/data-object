@@ -29,4 +29,5 @@ library
                      Data.Object.Scalar
                      Data.Object.String
                      Data.Object.Translate
+                     Data.Attempt
     ghc-options:     -Wall
