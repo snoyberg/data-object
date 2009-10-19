@@ -23,11 +23,11 @@ library
                      time >= 1,
                      safe,
                      old-locale >= 1,
-                     syb
+                     syb,
+                     attempt
     exposed-modules: Data.Object
                      Data.Object.Raw
                      Data.Object.Scalar
                      Data.Object.String
                      Data.Object.Translate
-                     Data.Attempt
     ghc-options:     -Wall
