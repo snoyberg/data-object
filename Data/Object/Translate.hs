@@ -27,12 +27,11 @@ module Data.Object.Translate
       -- * Specialized functions
     , toTranslateObject
     , fromTranslateObject
-    , lookupTranslateObject
     ) where
 
 import Data.Maybe (fromMaybe)
 import Data.Object
-import Data.Attempt
+import Control.Monad.Attempt.Class
 
 -- | Should usually be the well established I18N translation code. Examples
 -- include en, en_US, es, and so on. If you use these common codes, you will
@@ -87,18 +86,8 @@ translateKeyObject langs = mapKeysValues ($ langs) ($ langs)
 toTranslateObject :: ToObject a String Translator => a -> TranslateObject
 toTranslateObject = toObject
 
--- | 'fomObject' specialized for 'TranslateObject's
-fromTranslateObject :: (FromObject a String Translator)
+-- | 'fromObject' specialized for 'TranslateObject's
+fromTranslateObject :: (FromObject a String Translator, MonadAttempt m)
                     => TranslateObject
-                    -> Attempt a
+                    -> m a
 fromTranslateObject = fromObject
-
--- | 'lookupObject' specialized for 'TranslateObject's
-lookupTranslateObject :: ( ToScalar k String
-                         , Show k
-                         , FromObject v String Translator
-                         )
-                      => k
-                      -> [(String, TranslateObject)]
-                      -> Attempt v
-lookupTranslateObject = lookupObject

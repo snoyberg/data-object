@@ -15,7 +15,6 @@ module Data.Object.Scalar
     , ScalarObject
     , toScalarObject
     , fromScalarObject
-    , lookupScalarObject
     ) where
 
 import Data.ByteString.Lazy (ByteString, empty)
@@ -26,7 +25,7 @@ import Data.Object
 import Data.Object.Raw
 import System.Locale (defaultTimeLocale)
 import Data.Time.Format (formatTime)
-import Data.Attempt
+import Control.Monad.Attempt.Class
 
 data Scalar = Numeric   Rational
             | Text      Text
@@ -53,16 +52,7 @@ toScalarObject :: ToObject a String Scalar => a -> ScalarObject
 toScalarObject = toObject
 
 -- | 'fomObject' specialized for 'ScalarObject's
-fromScalarObject :: (FromObject a String Scalar)
+fromScalarObject :: (FromObject a String Scalar, MonadAttempt m)
                  => ScalarObject
-                 -> Attempt a
+                 -> m a
 fromScalarObject = fromObject
--- | 'lookupObject' specialized for 'ScalarObject's
-lookupScalarObject :: ( ToScalar k String
-                      , Show k
-                      , FromObject v String Scalar
-                      )
-                   => k
-                   -> [(String, ScalarObject)]
-                   -> Attempt v
-lookupScalarObject = lookupObject

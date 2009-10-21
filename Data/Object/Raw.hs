@@ -1,6 +1,7 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE DeriveDataTypeable #-}
 ---------------------------------------------------------
 --
 -- Module        : Data.Object.Raw
@@ -19,7 +20,6 @@ module Data.Object.Raw
     , RawObject
     , toRawObject
     , fromRawObject
-    , lookupRawObject
     ) where
 
 import Data.Object
@@ -30,11 +30,14 @@ import Data.Time.Calendar
 import Safe (readMay)
 import Control.Monad ((<=<))
 import Data.Ratio (Ratio)
-import Data.Attempt
+import Control.Monad.Attempt.Class
+import Data.Generics
 
 -- | A thin wrapper around a lazy bytestring.
 newtype Raw = Raw { unRaw :: B.ByteString }
-    deriving (Eq)
+    deriving (Eq, Typeable, Data)
+instance Show Raw where
+    show = show . unRaw
 
 -- | 'Object's with keys and values of type 'Raw'.
 type RawObject = Object Raw Raw
@@ -77,7 +80,7 @@ instance ListToRaw Char where
     listToRaw = Raw . toLazyByteString
 
 class ListFromRaw a where
-    listFromRaw :: Raw -> Attempt [a]
+    listFromRaw :: MonadAttempt m => Raw -> m [a]
 instance ListFromRaw a => FromScalar [a] Raw where
     fromScalar = listFromRaw
 instance ListFromRaw Char where
@@ -88,10 +91,11 @@ instance ToObject Char Raw Raw where
     listToObject = Scalar . Raw . toLazyByteString
 instance FromObject Char Raw Raw where
     fromObject = helper . fromLazyByteString . unRaw <=< getScalar where
-        helper :: String -> Attempt Char
+        helper :: MonadAttempt m => String -> m Char
         helper [x] = return x
         helper x = fail $ "Excepting a single character, received: " ++ x
-    listFromObject = fmap (fromLazyByteString . unRaw) . getScalar
+    listFromObject = fmap' (fromLazyByteString . unRaw) . getScalar where
+        fmap' f ma = ma >>= return . f
 
 -- Day
 instance ToScalar Day Raw where
@@ -183,15 +187,5 @@ toRawObject :: ToObject a Raw Raw => a -> RawObject
 toRawObject = toObject
 
 -- | 'fomObject' specialized for 'RawObject's
-fromRawObject :: (FromObject a Raw Raw) => RawObject -> Attempt a
+fromRawObject :: (MonadAttempt m, FromObject a Raw Raw) => RawObject -> m a
 fromRawObject = fromObject
-
--- | 'lookupObject' specialized for 'RawObject's
-lookupRawObject :: ( ToScalar k Raw
-                   , Show k
-                   , FromObject v Raw Raw
-                   )
-                => k
-                -> [(Raw, RawObject)]
-                -> Attempt v
-lookupRawObject = lookupObject

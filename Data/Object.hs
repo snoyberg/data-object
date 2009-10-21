@@ -48,8 +48,8 @@ module Data.Object
     , FromScalar (..)
     , ToObject (..)
     , FromObject (..)
-    , lookupObject
       -- * Helper functions
+    , lookupObject
       -- $scalarToFromObject
     , scalarToObject
     , scalarFromObject
@@ -66,7 +66,9 @@ import Data.Traversable
 import Data.Monoid
 
 import Data.Generics
-import Data.Attempt
+import qualified Data.Attempt.Helper as A
+import Control.Monad.Attempt.Class
+import qualified Control.Exception as E
 
 -- | Can represent nested values as scalars, sequences and mappings.  A
 -- sequence is synonymous with a list, while a mapping is synonymous with a
@@ -158,24 +160,30 @@ mapKeysValuesM fk fv =
         fv' = WrapMonad . fv
      in unwrapMonad . mapKeysValuesA fk' fv'
 
--- FIXME use an Exception type below?
+data ObjectExtractError =
+    ExpectedScalar
+    | ExpectedSequence
+    | ExpectedMapping
+    deriving (Typeable, Show)
+instance E.Exception ObjectExtractError
+
 -- | Extra a scalar from the input, failing if the input is a sequence or
 -- mapping.
-getScalar :: Object k v -> Attempt v
+getScalar :: MonadAttempt m => Object k v -> m v
 getScalar (Scalar s) = return s
-getScalar _ = fail "Attempt to extract a scalar from non-scalar"
+getScalar _ = failure ExpectedScalar
 
 -- | Extra a sequence from the input, failing if the input is a scalar or
 -- mapping.
-getSequence :: Object k v -> Attempt [Object k v]
+getSequence :: MonadAttempt m => Object k v -> m [Object k v]
 getSequence (Sequence s) = return s
-getSequence _ = fail "Attempt to extract a sequence from non-sequence"
+getSequence _ = failure ExpectedSequence
 
 -- | Extra a mapping from the input, failing if the input is a scalar or
 -- sequence.
-getMapping :: Object k v -> Attempt [(k, Object k v)]
+getMapping :: MonadAttempt m => Object k v -> m [(k, Object k v)]
 getMapping (Mapping m) = return m
-getMapping _ = fail "Attempt to extract a mapping from non-mapping"
+getMapping _ = failure ExpectedMapping
 
 -- $toFromDesc The terminology of to and from below can be a little misleading.
 -- It's most logical if we begin by looking at 'ToObject' and 'FromObject'.
@@ -232,7 +240,7 @@ class ToScalar x y where
 --                  Just i -> return i
 -- @
 class FromScalar x y where
-    fromScalar :: y -> Attempt x
+    fromScalar :: MonadAttempt m => y -> m x
 
 -- | Something which can be converted from a to 'Object' k v with guaranteed
 -- success. A somewhat unusual but very simple example would be:
@@ -329,15 +337,15 @@ class ToObject a k v where
 --
 -- Minimal complete definition: 'fromObject'.
 class FromObject a k v where
-    fromObject :: Object k v -> Attempt a
+    fromObject :: MonadAttempt m => Object k v -> m a
 
-    listFromObject :: Object k v -> Attempt [a]
+    listFromObject :: MonadAttempt m => Object k v -> m [a]
     listFromObject = mapM fromObject <=< getSequence
 
     -- FIXME is this actually necesary?
-    mapFromObject :: (FromScalar k' k)
+    mapFromObject :: (FromScalar k' k, MonadAttempt m)
                   => Object k v
-                  -> Attempt [(k', a)]
+                  -> m [(k', a)]
     mapFromObject =
         mapM (runKleisli (Kleisli fromScalar *** Kleisli fromObject))
          <=< getMapping
@@ -380,7 +388,8 @@ instance (FromScalar k k', FromObject v k' v') => FromObject (k, v) k' v' where
         mapM (runKleisli (Kleisli fromScalar *** Kleisli fromObject))
         <=< getMapping
 
--- | An equivalent of 'lookup' to deal specifically with maps of 'Object's. In particular, it will:
+-- | An equivalent of 'lookup' to deal specifically with maps of 'Object's. In
+-- particular, it will:
 --
 -- 1. Automatically convert the lookup key as necesary. For example- assuming
 -- you have the appropriate 'ToScalar' instances, you could lookup an 'Int' in
@@ -394,14 +403,18 @@ instance (FromScalar k k', FromObject v k' v') => FromObject (k, v) k' v' where
 --
 -- 4. Calls 'fromObject' automatically, so you get out the value type that you
 -- want, not just an 'Object'.
-lookupObject :: (ToScalar a' a, Eq a, Show a', FromObject b k v)
-             => a' -- ^ key
-             -> [(a, Object k v)] -- ^ map
-             -> Attempt b
-lookupObject key pairs =
-    case lookup (toScalar key) pairs of
-        Nothing -> fail $ "Key not found: " ++ show key
-        Just x -> fromObject x
+lookupObject :: ( ToScalar k' k
+                , FromObject o k v
+                , Typeable k
+                , Typeable v
+                , Show k
+                , Eq k
+                , MonadAttempt m
+                )
+             => k'
+             -> [(k, Object k v)]
+             -> m o
+lookupObject key pairs = A.lookup (toScalar key) pairs >>= fromObject
 
 -- $scalarToFromObject
 -- Due to overlapping instances, we cannot automatically make all instances of
@@ -417,5 +430,5 @@ scalarToObject = Scalar . toScalar
 
 -- | An appropriate 'fromObject' function for any types x and y which have a
 -- 'FromScalar' x y instance.
-scalarFromObject :: FromScalar x y => Object k y -> Attempt x
+scalarFromObject :: MonadAttempt m => FromScalar x y => Object k y -> m x
 scalarFromObject = fromScalar <=< getScalar

@@ -17,11 +17,10 @@ module Data.Object.String
     ( StringObject
     , toStringObject
     , fromStringObject
-    , lookupStringObject
     ) where
 
 import Data.Object
-import Data.Attempt
+import Control.Monad.Attempt.Class
 
 type StringObject = Object String String
 
@@ -30,17 +29,7 @@ toStringObject :: ToObject a String String => a -> StringObject
 toStringObject = toObject
 
 -- | 'fomObject' specialized for 'StringObject's
-fromStringObject :: (FromObject a String String)
+fromStringObject :: (FromObject a String String, MonadAttempt m)
                  => StringObject
-                 -> Attempt a
+                 -> m a
 fromStringObject = fromObject
-
--- | 'lookupObject' specialized for 'StringObject's
-lookupStringObject :: ( ToScalar k String
-                      , Show k
-                      , FromObject v String String
-                      )
-                   => k
-                   -> [(String, StringObject)]
-                   -> Attempt v
-lookupStringObject = lookupObject
