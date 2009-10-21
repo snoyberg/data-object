@@ -51,7 +51,7 @@ instance ToScalar Scalar Raw where
 toScalarObject :: ToObject a String Scalar => a -> ScalarObject
 toScalarObject = toObject
 
--- | 'fomObject' specialized for 'ScalarObject's
+-- | 'fromObject' specialized for 'ScalarObject's
 fromScalarObject :: (FromObject a String Scalar, MonadAttempt m)
                  => ScalarObject
                  -> m a

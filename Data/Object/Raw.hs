@@ -186,6 +186,6 @@ instance FromObject (Ratio Integer) k Raw where
 toRawObject :: ToObject a Raw Raw => a -> RawObject
 toRawObject = toObject
 
--- | 'fomObject' specialized for 'RawObject's
+-- | 'fromObject' specialized for 'RawObject's
 fromRawObject :: (MonadAttempt m, FromObject a Raw Raw) => RawObject -> m a
 fromRawObject = fromObject

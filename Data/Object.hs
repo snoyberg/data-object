@@ -18,7 +18,7 @@
 --
 ---------------------------------------------------------
 
--- | The core of this module is the 'Object' data type, which is used for
+-- | The core of this package is the 'Object' data type, which is used for
 -- handling scalars, sequences and mappings in a nested manner. This
 -- is the same structure used in JSON or Yaml data.
 --
@@ -26,7 +26,7 @@
 -- within this package provide more concrete datatypes, such as a 'String'
 -- 'Object' and a specialized scalar type.
 --
--- Besides for 'Object' data type, there are utility functions and type classes
+-- Besides the 'Object' data type, there are utility functions and type classes
 -- for converting objects around. Care has been taken to avoid any overloaded
 -- instances for these type classes.
 module Data.Object
@@ -39,6 +39,7 @@ module Data.Object
     , mapKeysValuesA
     , mapKeysValuesM
       -- * Extracting underlying values
+    , ObjectExtractError (..)
     , getScalar
     , getSequence
     , getMapping
@@ -50,6 +51,7 @@ module Data.Object
     , FromObject (..)
       -- * Helper functions
     , lookupObject
+      -- ** Scalar/Object conversions
       -- $scalarToFromObject
     , scalarToObject
     , scalarFromObject
@@ -117,19 +119,19 @@ instance Applicative (Object key) where
 
 -- | Apply some conversion to the keys of an 'Object', leaving the values
 -- unchanged.
-mapKeys :: (key1 -> key2) -> Object key1 val -> Object key2 val
+mapKeys :: (keyIn -> keyOut) -> Object keyIn val -> Object keyOut val
 mapKeys = flip mapKeysValues id
 
 -- | Apply some conversion to the values of an 'Object', leaving the keys
 -- unchanged. This is equivalent to 'fmap'.
-mapValues :: (val1 -> val2) -> Object key val1 -> Object key val2
+mapValues :: (valIn -> valOut) -> Object key valIn -> Object key valOut
 mapValues = mapKeysValues id
 
 -- | Apply a conversion to both the keys and values of an 'Object'.
-mapKeysValues :: (key1 -> key2)
-              -> (val1 -> val2)
-              -> Object key1 val1
-              -> Object key2 val2
+mapKeysValues :: (keyIn -> keyOut)
+              -> (valIn -> valOut)
+              -> Object keyIn valIn
+              -> Object keyOut valOut
 mapKeysValues _ fv (Scalar v) = Scalar $ fv v
 mapKeysValues fk fv (Sequence os)= Sequence $ map (mapKeysValues fk fv) os
 mapKeysValues fk fv (Mapping pairs) =
@@ -137,11 +139,11 @@ mapKeysValues fk fv (Mapping pairs) =
 
 -- | Apply an 'Applicative' conversion to both the keys and values of an
 -- 'Object'.
-mapKeysValuesA :: (Applicative f, Functor f)
-               => (key1 -> f key2)
-               -> (val1 -> f val2)
-               -> Object key1 val1
-               -> f (Object key2 val2)
+mapKeysValuesA :: Applicative f
+               => (keyIn -> f keyOut)
+               -> (valIn -> f valOut)
+               -> Object keyIn valIn
+               -> f (Object keyOut valOut)
 mapKeysValuesA _ fv (Scalar v) = Scalar <$> fv v
 mapKeysValuesA fk fv (Sequence os) =
     Sequence <$> traverse (mapKeysValuesA fk fv) os
@@ -151,15 +153,17 @@ mapKeysValuesA fk fv (Mapping pairs) = Mapping <$>
 -- | The same as 'mapKeysValuesA', but using a 'Monad' since some people are
 -- more comfortable with 'Monad's and not all 'Monad's are 'Applicative'.
 mapKeysValuesM :: Monad m
-               => (key1 -> m key2)
-               -> (val1 -> m val2)
-               -> Object key1 val1
-               -> m (Object key2 val2)
+               => (keyIn -> m keyOut)
+               -> (valIn -> m valOut)
+               -> Object keyIn valIn
+               -> m (Object keyOut valOut)
 mapKeysValuesM fk fv =
     let fk' = WrapMonad . fk
         fv' = WrapMonad . fv
      in unwrapMonad . mapKeysValuesA fk' fv'
 
+-- | An error value returned when an unexpected node is encountered, eg you
+-- were expecting a 'Scalar' and found a 'Mapping'.
 data ObjectExtractError =
     ExpectedScalar
     | ExpectedSequence
@@ -198,21 +202,21 @@ getMapping _ = failure ExpectedMapping
 --     data Person = Person { name :: String, age :: Int }
 --     instance ToObject Person String String where
 --         toObject (Person n a) = Mapping
---             [ ("name", Scalar n)
---             , ("age", Scalar $ show a)
+--             [ (\"name\", Scalar n)
+--             , (\"age\", Scalar $ show a)
 --             ]
 -- @
 --
 -- Obviously, if 'FromObject' received a value looking like (in JSON notation)
 -- {name:\"John\",age:30}, the result should be Person \"John\"
 -- 30. However, what do you do with the value {foo:\"bar\"}? That's why the
--- result of 'fromObject' is wrapped in an 'Attempt'.
+-- result of 'fromObject' is wrapped in a 'MonadAttempt'.
 --
 -- 'ToScalar' and 'FromScalar' then borrow the same terminology. Since
 -- 'ToScalar' is intended to be called by 'ToObject' instances, it needs to
--- guarantee success; thus no 'Attempt' wrapper. 'FromScalar' simply allows a
--- failure to occur. Using the example from above, if the value passed to
--- fromObject was {name:\"John\",age:\"thirty\"}, the 'fromScalar' call on
+-- guarantee success; thus no 'MonadAttempt' wrapper. 'FromScalar' simply
+-- allows a failure to occur. Using the example from above, if the value passed
+-- to fromObject was {name:\"John\",age:\"thirty\"}, the 'fromScalar' call on
 -- \"thirty\" should fail, saying that \"thirty\" cannot be converted to an
 -- 'Int'.
 
@@ -232,12 +236,20 @@ class ToScalar x y where
 -- 'Int's, so you could define (with appropriate language extensions):
 --
 -- @
---      import Safe (readMay)
+--      instance FromScalar Int String where
+--          fromScalar = Data.Attempt.Helper.read
+-- @
+--
+-- Or, you could provide your own error wrapper.
+--
+-- @
+--      newtype InvalidInt = InvalidInt String deriving (Show, Typeable)
+--      instance Exception InvalidInt
 --      instance FromScalar Int String where
 --          fromScalar s =
---              case readMay s of
---                  Nothing -> fail $ \"Invalid Int: \" ++ s
---                  Just i -> return i
+--              'attempt' ('const' $ 'failure' $ InvalidInt s)
+--                      return
+--                      ('Data.Attempt.Helper.read' s)
 -- @
 class FromScalar x y where
     fromScalar :: MonadAttempt m => y -> m x
@@ -248,11 +260,11 @@ class FromScalar x y where
 -- @
 --    data TestScore = TestScore { name :: String, score :: Int }
 --    instance ToObject [TestScore] String Int where
---        {- Explicit version, slightly long-winded
+--        {- Explicit version, slightly tedious
 --        toObject = Mapping . map (name &&& Scalar . score)
 --        -}
 --        {- Or, just let toObject figure it out for you! -}
---        toObject = toObject . map (name &&& score) where
+--        toObject = toObject . map (name &&& score)
 -- @
 --
 -- Then toObject [TestScore \"Abe\" 5, TestScore \"Bill\" 2] would produce, in

@@ -28,7 +28,7 @@ type StringObject = Object String String
 toStringObject :: ToObject a String String => a -> StringObject
 toStringObject = toObject
 
--- | 'fomObject' specialized for 'StringObject's
+-- | 'fromObject' specialized for 'StringObject's
 fromStringObject :: (FromObject a String String, MonadAttempt m)
                  => StringObject
                  -> m a
