@@ -30,7 +30,7 @@ import Data.Time.Calendar
 import Safe (readMay)
 import Control.Monad ((<=<))
 import Data.Ratio (Ratio)
-import Control.Monad.Attempt.Class
+import Data.Attempt
 import Data.Generics
 
 -- | A thin wrapper around a lazy bytestring.
@@ -94,8 +94,7 @@ instance FromObject Char Raw Raw where
         helper :: MonadAttempt m => String -> m Char
         helper [x] = return x
         helper x = fail $ "Excepting a single character, received: " ++ x
-    listFromObject = fmap' (fromLazyByteString . unRaw) . getScalar where
-        fmap' f ma = ma >>= return . f
+    listFromObject = fmap (fromLazyByteString . unRaw) . getScalar
 
 -- Day
 instance ToScalar Day Raw where
@@ -187,5 +186,5 @@ toRawObject :: ToObject a Raw Raw => a -> RawObject
 toRawObject = toObject
 
 -- | 'fromObject' specialized for 'RawObject's
-fromRawObject :: (MonadAttempt m, FromObject a Raw Raw) => RawObject -> m a
+fromRawObject :: FromObject a Raw Raw => RawObject -> Attempt a
 fromRawObject = fromObject

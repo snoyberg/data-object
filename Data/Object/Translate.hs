@@ -31,7 +31,7 @@ module Data.Object.Translate
 
 import Data.Maybe (fromMaybe)
 import Data.Object
-import Control.Monad.Attempt.Class
+import Data.Attempt
 
 -- | Should usually be the well established I18N translation code. Examples
 -- include en, en_US, es, and so on. If you use these common codes, you will
@@ -87,7 +87,7 @@ toTranslateObject :: ToObject a String Translator => a -> TranslateObject
 toTranslateObject = toObject
 
 -- | 'fromObject' specialized for 'TranslateObject's
-fromTranslateObject :: (FromObject a String Translator, MonadAttempt m)
+fromTranslateObject :: FromObject a String Translator
                     => TranslateObject
-                    -> m a
+                    -> Attempt a
 fromTranslateObject = fromObject

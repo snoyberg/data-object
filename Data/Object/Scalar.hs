@@ -25,7 +25,7 @@ import Data.Object
 import Data.Object.Raw
 import System.Locale (defaultTimeLocale)
 import Data.Time.Format (formatTime)
-import Control.Monad.Attempt.Class
+import Data.Attempt
 
 data Scalar = Numeric   Rational
             | Text      Text
@@ -52,7 +52,7 @@ toScalarObject :: ToObject a String Scalar => a -> ScalarObject
 toScalarObject = toObject
 
 -- | 'fromObject' specialized for 'ScalarObject's
-fromScalarObject :: (FromObject a String Scalar, MonadAttempt m)
+fromScalarObject :: FromObject a String Scalar
                  => ScalarObject
-                 -> m a
+                 -> Attempt a
 fromScalarObject = fromObject

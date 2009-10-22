@@ -20,7 +20,7 @@ module Data.Object.String
     ) where
 
 import Data.Object
-import Control.Monad.Attempt.Class
+import Data.Attempt
 
 type StringObject = Object String String
 
@@ -29,7 +29,7 @@ toStringObject :: ToObject a String String => a -> StringObject
 toStringObject = toObject
 
 -- | 'fromObject' specialized for 'StringObject's
-fromStringObject :: (FromObject a String String, MonadAttempt m)
+fromStringObject :: FromObject a String String
                  => StringObject
-                 -> m a
+                 -> Attempt a
 fromStringObject = fromObject

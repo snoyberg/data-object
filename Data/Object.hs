@@ -69,8 +69,8 @@ import Data.Monoid
 
 import Data.Generics
 import qualified Data.Attempt.Helper as A
-import Control.Monad.Attempt.Class
 import qualified Control.Exception as E
+import Data.Attempt
 
 -- | Can represent nested values as scalars, sequences and mappings.  A
 -- sequence is synonymous with a list, while a mapping is synonymous with a
@@ -173,19 +173,19 @@ instance E.Exception ObjectExtractError
 
 -- | Extra a scalar from the input, failing if the input is a sequence or
 -- mapping.
-getScalar :: MonadAttempt m => Object k v -> m v
+getScalar :: Object k v -> Attempt v
 getScalar (Scalar s) = return s
 getScalar _ = failure ExpectedScalar
 
 -- | Extra a sequence from the input, failing if the input is a scalar or
 -- mapping.
-getSequence :: MonadAttempt m => Object k v -> m [Object k v]
+getSequence :: Object k v -> Attempt [Object k v]
 getSequence (Sequence s) = return s
 getSequence _ = failure ExpectedSequence
 
 -- | Extra a mapping from the input, failing if the input is a scalar or
 -- sequence.
-getMapping :: MonadAttempt m => Object k v -> m [(k, Object k v)]
+getMapping :: Object k v -> Attempt [(k, Object k v)]
 getMapping (Mapping m) = return m
 getMapping _ = failure ExpectedMapping
 
@@ -210,11 +210,11 @@ getMapping _ = failure ExpectedMapping
 -- Obviously, if 'FromObject' received a value looking like (in JSON notation)
 -- {name:\"John\",age:30}, the result should be Person \"John\"
 -- 30. However, what do you do with the value {foo:\"bar\"}? That's why the
--- result of 'fromObject' is wrapped in a 'MonadAttempt'.
+-- result of 'fromObject' is wrapped in a 'Attempt'.
 --
 -- 'ToScalar' and 'FromScalar' then borrow the same terminology. Since
 -- 'ToScalar' is intended to be called by 'ToObject' instances, it needs to
--- guarantee success; thus no 'MonadAttempt' wrapper. 'FromScalar' simply
+-- guarantee success; thus no 'Attempt' wrapper. 'FromScalar' simply
 -- allows a failure to occur. Using the example from above, if the value passed
 -- to fromObject was {name:\"John\",age:\"thirty\"}, the 'fromScalar' call on
 -- \"thirty\" should fail, saying that \"thirty\" cannot be converted to an
@@ -252,7 +252,7 @@ class ToScalar x y where
 --                      ('Data.Attempt.Helper.read' s)
 -- @
 class FromScalar x y where
-    fromScalar :: MonadAttempt m => y -> m x
+    fromScalar :: y -> Attempt x
 
 -- | Something which can be converted from a to 'Object' k v with guaranteed
 -- success. A somewhat unusual but very simple example would be:
@@ -349,15 +349,15 @@ class ToObject a k v where
 --
 -- Minimal complete definition: 'fromObject'.
 class FromObject a k v where
-    fromObject :: MonadAttempt m => Object k v -> m a
+    fromObject :: Object k v -> Attempt a
 
-    listFromObject :: MonadAttempt m => Object k v -> m [a]
+    listFromObject :: Object k v -> Attempt [a]
     listFromObject = mapM fromObject <=< getSequence
 
     -- FIXME is this actually necesary?
-    mapFromObject :: (FromScalar k' k, MonadAttempt m)
+    mapFromObject :: FromScalar k' k
                   => Object k v
-                  -> m [(k', a)]
+                  -> Attempt [(k', a)]
     mapFromObject =
         mapM (runKleisli (Kleisli fromScalar *** Kleisli fromObject))
          <=< getMapping
@@ -373,12 +373,6 @@ instance (ToScalar k k', ToScalar v v') => ToObject (Object k v) k' v' where
 instance (FromScalar k k', FromScalar v v')
   => FromObject (Object k v) k' v' where
     fromObject = mapKeysValuesM fromScalar fromScalar
-
--- Scalar
-instance ToObject v k v where
-    toObject = Scalar
-instance FromObject v k v where
-    fromObject = getScalar
 
 -- Sequence
 instance ToObject a k v => ToObject [a] k v where
@@ -421,11 +415,10 @@ lookupObject :: ( ToScalar k' k
                 , Typeable v
                 , Show k
                 , Eq k
-                , MonadAttempt m
                 )
              => k'
              -> [(k, Object k v)]
-             -> m o
+             -> Attempt o
 lookupObject key pairs = A.lookup (toScalar key) pairs >>= fromObject
 
 -- $scalarToFromObject
@@ -442,5 +435,5 @@ scalarToObject = Scalar . toScalar
 
 -- | An appropriate 'fromObject' function for any types x and y which have a
 -- 'FromScalar' x y instance.
-scalarFromObject :: MonadAttempt m => FromScalar x y => Object k y -> m x
+scalarFromObject :: FromScalar x y => Object k y -> Attempt x
 scalarFromObject = fromScalar <=< getScalar
