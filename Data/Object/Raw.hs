@@ -93,7 +93,8 @@ instance FromObject Char Raw Raw where
     fromObject = helper . fromLazyByteString . unRaw <=< getScalar where
         helper :: MonadAttempt m => String -> m Char
         helper [x] = return x
-        helper x = fail $ "Excepting a single character, received: " ++ x
+        helper x =
+            failureString $ "Excepting a single character, received: " ++ x
     listFromObject = fmap (fromLazyByteString . unRaw) . getScalar
 
 -- Day
@@ -105,7 +106,7 @@ instance FromScalar Day Raw where
     fromScalar (Raw bs) = do
         let s = fromLazyByteString bs
         if length s /= 10
-            then fail ("Invalid day: " ++ s)
+            then failureString ("Invalid day: " ++ s)
             else do
                 let x = do
                     y' <- readMay $ take 4 s
@@ -114,7 +115,7 @@ instance FromScalar Day Raw where
                     return (y', m', d')
                 case x of
                     Just (y, m, d) -> return $ fromGregorian y m d
-                    Nothing -> fail $ "Invalid day: " ++ s
+                    Nothing -> failureString $ "Invalid day: " ++ s
 instance FromObject Day k Raw where
     fromObject = scalarFromObject
 
@@ -151,7 +152,7 @@ instance FromScalar Bool Raw where
             "Off" -> return False
             "OFF" -> return False
 
-            x -> fail $ "Invalid bool value: " ++ x
+            x -> failureString $ "Invalid bool value: " ++ x
 instance FromObject Bool k Raw where
     fromObject = scalarFromObject
 
@@ -163,7 +164,8 @@ instance ToObject Int k Raw where
 instance FromScalar Int Raw where
     fromScalar (Raw bs) =
         case readMay $ fromLazyByteString bs of
-            Nothing -> fail $ "Invalid integer: " ++ fromLazyByteString bs
+            Nothing ->
+                failureString $ "Invalid integer: " ++ fromLazyByteString bs
             Just i -> return i
 instance FromObject Int k Raw where
     fromObject = scalarFromObject
@@ -176,7 +178,8 @@ instance ToObject (Ratio Integer) k Raw where
 instance FromScalar (Ratio Integer) Raw where
     fromScalar (Raw bs) =
         case readMay $ fromLazyByteString bs of
-            Nothing -> fail $ "Invalid rational: " ++ fromLazyByteString bs
+            Nothing ->
+                failureString $ "Invalid rational: " ++ fromLazyByteString bs
             Just i -> return i
 instance FromObject (Ratio Integer) k Raw where
     fromObject = scalarFromObject

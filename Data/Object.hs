@@ -389,7 +389,7 @@ instance (FromScalar k k', FromObject v k' v') => FromObject (k, v) k' v' where
         ms <- listFromObject o
         case ms of
             [m] -> return m
-            _ -> fail "fromObject of pair requires mapping of size 1"
+            _ -> failureString "fromObject of pair requires mapping of size 1"
     listFromObject =
         mapM (runKleisli (Kleisli fromScalar *** Kleisli fromObject))
         <=< getMapping
