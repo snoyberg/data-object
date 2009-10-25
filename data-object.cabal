@@ -29,5 +29,4 @@ library
                      Data.Object.Raw
                      Data.Object.Scalar
                      Data.Object.String
-                     Data.Object.Translate
     ghc-options:     -Wall
