@@ -25,7 +25,8 @@ library
                      safe,
                      old-locale >= 1,
                      syb,
-                     attempt
+                     attempt,
+                     convertible >= 1.0.6
     exposed-modules: Data.Object
                      Data.Object.Raw
                      Data.Object.Scalar

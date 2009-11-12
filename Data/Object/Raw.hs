@@ -33,6 +33,7 @@ import Data.Ratio (Ratio)
 import Data.Attempt
 import Data.Generics
 import Control.Exception (Exception)
+import Data.Convertible
 
 -- | A thin wrapper around a lazy bytestring.
 newtype Raw = Raw { unRaw :: B.ByteString }
@@ -44,28 +45,28 @@ instance Show Raw where
 type RawObject = Object Raw Raw
 
 -- lazy bytestrings
-instance ToScalar B.ByteString Raw where
-    toScalar = Raw
-instance ToScalar Raw B.ByteString where
-    toScalar = unRaw
-instance FromScalar B.ByteString Raw where
-    fromScalar = return . toScalar
-instance FromScalar Raw B.ByteString where
-    fromScalar = return . toScalar
+instance ConvertSuccess B.ByteString Raw where
+    convertSuccess = Raw
+instance ConvertSuccess Raw B.ByteString where
+    convertSuccess = unRaw
+instance ConvertAttempt B.ByteString Raw where
+    convertAttempt = return . convertSuccess
+instance ConvertAttempt Raw B.ByteString where
+    convertAttempt = return . convertSuccess
 instance ToObject B.ByteString a Raw where
     toObject = scalarToObject
 instance FromObject B.ByteString a Raw where
     fromObject = scalarFromObject
 
 -- strict bytestrings
-instance ToScalar BS.ByteString Raw where
-    toScalar = Raw . toLazyByteString
-instance ToScalar Raw BS.ByteString where
-    toScalar = fromLazyByteString . unRaw
-instance FromScalar BS.ByteString Raw where
-    fromScalar = return . toScalar
-instance FromScalar Raw BS.ByteString where
-    fromScalar = return . toScalar
+instance ConvertSuccess BS.ByteString Raw where
+    convertSuccess = Raw . toLazyByteString
+instance ConvertSuccess Raw BS.ByteString where
+    convertSuccess = fromLazyByteString . unRaw
+instance ConvertAttempt BS.ByteString Raw where
+    convertAttempt = return . convertSuccess
+instance ConvertAttempt Raw BS.ByteString where
+    convertAttempt = return . convertSuccess
 instance ToObject BS.ByteString a Raw where
     toObject = scalarToObject
 instance FromObject BS.ByteString a Raw where
@@ -75,15 +76,17 @@ instance FromObject BS.ByteString a Raw where
 -- Extra complication since we're avoiding overlapping instances.
 class ListToRaw a where
     listToRaw :: [a] -> Raw
-instance ListToRaw a => ToScalar [a] Raw where
-    toScalar = listToRaw
+instance ListToRaw a => ConvertAttempt [a] Raw where
+    convertAttempt = return . convertSuccess
+instance ListToRaw a => ConvertSuccess [a] Raw where
+    convertSuccess = listToRaw
 instance ListToRaw Char where
     listToRaw = Raw . toLazyByteString
 
 class ListFromRaw a where
     listFromRaw :: MonadFailure ExpectedSingleCharacter m => Raw -> m [a] -- FIXME rather ugly
-instance ListFromRaw a => FromScalar [a] Raw where
-    fromScalar = listFromRaw
+instance ListFromRaw a => ConvertAttempt Raw [a] where
+    convertAttempt = listFromRaw
 instance ListFromRaw Char where
     listFromRaw = return . fromLazyByteString . unRaw
 
@@ -101,12 +104,14 @@ instance FromObject Char Raw Raw where
     listFromObject = fmap (fromLazyByteString . unRaw) . getScalar
 
 -- Day
-instance ToScalar Day Raw where
-    toScalar = Raw . toLazyByteString . show
+instance ConvertSuccess Day Raw where
+    convertSuccess = Raw . toLazyByteString . show
+instance ConvertAttempt Day Raw where
+    convertAttempt = return . convertSuccess
 instance ToObject Day k Raw where
     toObject = scalarToObject
-instance FromScalar Day Raw where
-    fromScalar (Raw bs) = do
+instance ConvertAttempt Raw Day where
+    convertAttempt (Raw bs) = do
         let s = fromLazyByteString bs
         if length s /= 10
             then failureString ("Invalid day: " ++ s)
@@ -123,12 +128,14 @@ instance FromObject Day k Raw where
     fromObject = scalarFromObject
 
 -- Bool
-instance ToScalar Bool Raw where
-    toScalar b = Raw $ toLazyByteString $ if b then "true" else "false"
+instance ConvertAttempt Bool Raw where
+    convertAttempt = return . convertSuccess
+instance ConvertSuccess Bool Raw where
+    convertSuccess b = Raw $ toLazyByteString $ if b then "true" else "false"
 instance ToObject Bool k Raw where
     toObject = scalarToObject
-instance FromScalar Bool Raw where
-    fromScalar (Raw bs) =
+instance ConvertAttempt Raw Bool where
+    convertAttempt (Raw bs) =
         case fromLazyByteString bs of
             -- list comes from http://yaml.org/type/bool.html
             "y" -> return True
@@ -160,12 +167,14 @@ instance FromObject Bool k Raw where
     fromObject = scalarFromObject
 
 -- Int
-instance ToScalar Int Raw where
-    toScalar = Raw . toLazyByteString . show
+instance ConvertSuccess Int Raw where
+    convertSuccess = Raw . toLazyByteString . show
+instance ConvertAttempt Int Raw where
+    convertAttempt = return . convertSuccess
 instance ToObject Int k Raw where
     toObject = scalarToObject
-instance FromScalar Int Raw where
-    fromScalar (Raw bs) =
+instance ConvertAttempt Raw Int where
+    convertAttempt (Raw bs) =
         case readMay $ fromLazyByteString bs of
             Nothing ->
                 failureString $ "Invalid integer: " ++ fromLazyByteString bs
@@ -174,12 +183,14 @@ instance FromObject Int k Raw where
     fromObject = scalarFromObject
 
 -- Rational
-instance ToScalar (Ratio Integer) Raw where
-    toScalar = Raw . toLazyByteString . show
+instance ConvertSuccess (Ratio Integer) Raw where
+    convertSuccess = Raw . toLazyByteString . show
+instance ConvertAttempt (Ratio Integer) Raw where
+    convertAttempt = return . convertSuccess
 instance ToObject (Ratio Integer) k Raw where
     toObject = scalarToObject
-instance FromScalar (Ratio Integer) Raw where
-    fromScalar (Raw bs) =
+instance ConvertAttempt Raw (Ratio Integer) where
+    convertAttempt (Raw bs) =
         case readMay $ fromLazyByteString bs of
             Nothing ->
                 failureString $ "Invalid rational: " ++ fromLazyByteString bs

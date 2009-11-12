@@ -44,9 +44,6 @@ module Data.Object
     , getSequence
     , getMapping
       -- * Higher level conversions
-      -- $toFromDesc
-    , ToScalar (..)
-    , FromScalar (..)
     , ToObject (..)
     , FromObject (..)
       -- * Helper functions
@@ -71,6 +68,8 @@ import Data.Generics
 import qualified Safe.Failure as A
 import qualified Control.Exception as E
 import Data.Attempt
+
+import Data.Convertible
 
 -- | Can represent nested values as scalars, sequences and mappings.  A
 -- sequence is synonymous with a list, while a mapping is synonymous with a
@@ -189,71 +188,6 @@ getMapping :: Object k v -> Attempt [(k, Object k v)]
 getMapping (Mapping m) = return m
 getMapping _ = failure ExpectedMapping
 
--- $toFromDesc The terminology of to and from below can be a little misleading.
--- It's most logical if we begin by looking at 'ToObject' and 'FromObject'.
--- 'ToObject' is the type for anything which can be converted to an 'Object'
--- with a specified key and value combination. This conversion must be
--- guaranteed to succeed, since the implementor has full knowledge of the type
--- of the object they are converting.
---
--- 'FromObject', on the other hand, might fail. For example, let's say you have the following:
---
--- @
---     data Person = Person { name :: String, age :: Int }
---     instance ToObject Person String String where
---         toObject (Person n a) = Mapping
---             [ (\"name\", Scalar n)
---             , (\"age\", Scalar $ show a)
---             ]
--- @
---
--- Obviously, if 'FromObject' received a value looking like (in JSON notation)
--- {name:\"John\",age:30}, the result should be Person \"John\"
--- 30. However, what do you do with the value {foo:\"bar\"}? That's why the
--- result of 'fromObject' is wrapped in a 'Attempt'.
---
--- 'ToScalar' and 'FromScalar' then borrow the same terminology. Since
--- 'ToScalar' is intended to be called by 'ToObject' instances, it needs to
--- guarantee success; thus no 'Attempt' wrapper. 'FromScalar' simply
--- allows a failure to occur. Using the example from above, if the value passed
--- to fromObject was {name:\"John\",age:\"thirty\"}, the 'fromScalar' call on
--- \"thirty\" should fail, saying that \"thirty\" cannot be converted to an
--- 'Int'.
-
--- | Something which can be converted from x to y with guaranteed success. For
--- example, every 'Int' can be represented by a 'String', so you could define
--- (with appropriate language extensions):
---
--- @
---      instance ToScalar Int String where
---          toScalar = show
--- @
-
-class ToScalar x y where
-    toScalar :: x -> y
--- | Something which can have an attempted conversion from y to x with the
--- possibility of failure. For example, certain 'String's can be converted to
--- 'Int's, so you could define (with appropriate language extensions):
---
--- @
---      instance FromScalar Int String where
---          fromScalar = Data.Attempt.Helper.read
--- @
---
--- Or, you could provide your own error wrapper.
---
--- @
---      newtype InvalidInt = InvalidInt String deriving (Show, Typeable)
---      instance Exception InvalidInt
---      instance FromScalar Int String where
---          fromScalar s =
---              'attempt' ('const' $ 'failure' $ InvalidInt s)
---                      return
---                      ('Data.Attempt.Helper.read' s)
--- @
-class FromScalar x y where
-    fromScalar :: y -> Attempt x
-
 -- | Something which can be converted from a to 'Object' k v with guaranteed
 -- success. A somewhat unusual but very simple example would be:
 --
@@ -295,8 +229,8 @@ class ToObject a k v where
     listToObject = Sequence . map toObject
 
     -- FIXME is this actually necesary?
-    mapToObject :: ToScalar k' k => [(k', a)] -> Object k v
-    mapToObject = Mapping . map (toScalar *** toObject)
+    mapToObject :: ConvertSuccess k' k => [(k', a)] -> Object k v
+    mapToObject = Mapping . map (convertSuccess *** toObject)
 
 -- | Something which can attempt a conversion from 'Object' k v to a with a
 -- possibility of failure. To finish off with the example in 'ToObject':
@@ -355,24 +289,24 @@ class FromObject a k v where
     listFromObject = mapM fromObject <=< getSequence
 
     -- FIXME is this actually necesary?
-    mapFromObject :: FromScalar k' k
+    mapFromObject :: ConvertAttempt k k'
                   => Object k v
                   -> Attempt [(k', a)]
     mapFromObject =
-        mapM (runKleisli (Kleisli fromScalar *** Kleisli fromObject))
+        mapM (runKleisli (Kleisli convertAttempt *** Kleisli fromObject))
          <=< getMapping
 
--- Identities for To/FromScalar
-instance ToScalar k k where toScalar = id
-instance FromScalar k k where fromScalar = return
+-- Identities for To/ConvertAttempt
+instance ConvertSuccess k k where convertSuccess = id
+instance ConvertAttempt k k where convertAttempt = return
 
 -- Converting between different types of Objects
-instance (ToScalar k k', ToScalar v v') => ToObject (Object k v) k' v' where
-    toObject = mapKeysValues toScalar toScalar
+instance (ConvertSuccess k k', ConvertSuccess v v') => ToObject (Object k v) k' v' where
+    toObject = mapKeysValues convertSuccess convertSuccess
 
-instance (FromScalar k k', FromScalar v v')
+instance (ConvertAttempt k' k, ConvertAttempt v' v)
   => FromObject (Object k v) k' v' where
-    fromObject = mapKeysValuesM fromScalar fromScalar
+    fromObject = mapKeysValuesM convertAttempt convertAttempt
 
 -- Sequence
 instance ToObject a k v => ToObject [a] k v where
@@ -381,24 +315,24 @@ instance FromObject a k v => FromObject [a] k v where
     fromObject = listFromObject
 
 -- Mapping
-instance (ToScalar k k', ToObject v k' v') => ToObject (k, v) k' v' where
+instance (ConvertSuccess k k', ToObject v k' v') => ToObject (k, v) k' v' where
     toObject = listToObject . return
-    listToObject = Mapping . map (toScalar *** toObject)
-instance (FromScalar k k', FromObject v k' v') => FromObject (k, v) k' v' where
+    listToObject = Mapping . map (convertSuccess *** toObject)
+instance (ConvertAttempt k' k, FromObject v k' v') => FromObject (k, v) k' v' where
     fromObject o = do
         ms <- listFromObject o
         case ms of
             [m] -> return m
             _ -> failureString "fromObject of pair requires mapping of size 1"
     listFromObject =
-        mapM (runKleisli (Kleisli fromScalar *** Kleisli fromObject))
+        mapM (runKleisli (Kleisli convertAttempt *** Kleisli fromObject))
         <=< getMapping
 
 -- | An equivalent of 'lookup' to deal specifically with maps of 'Object's. In
 -- particular, it will:
 --
 -- 1. Automatically convert the lookup key as necesary. For example- assuming
--- you have the appropriate 'ToScalar' instances, you could lookup an 'Int' in
+-- you have the appropriate 'ConvertSuccess' instances, you could lookup an 'Int' in
 -- a map that has 'String' keys.
 --
 -- 2. Return the result in an 'Attempt', not 'Maybe'. This is especially useful
@@ -409,7 +343,7 @@ instance (FromScalar k k', FromObject v k' v') => FromObject (k, v) k' v' where
 --
 -- 4. Calls 'fromObject' automatically, so you get out the value type that you
 -- want, not just an 'Object'.
-lookupObject :: ( ToScalar k' k
+lookupObject :: ( ConvertSuccess k' k
                 , FromObject o k v
                 , Typeable k
                 , Typeable v
@@ -419,21 +353,21 @@ lookupObject :: ( ToScalar k' k
              => k'
              -> [(k, Object k v)]
              -> Attempt o
-lookupObject key pairs = A.lookup (toScalar key) pairs >>= fromObject
+lookupObject key pairs = A.lookup (convertSuccess key) pairs >>= fromObject
 
 -- $scalarToFromObject
 -- Due to overlapping instances, we cannot automatically make all instances of
--- 'ToScalar' instances of 'ToObject' (and same with
--- 'FromScalar'/'FromObject'), even though the implementation is standard. Just
--- use the following functions whenever you declare 'ToScalar'/'FromScalar'
+-- 'ConvertSuccess' instances of 'ToObject' (and same with
+-- 'ConvertAttempt'/'FromObject'), even though the implementation is standard. Just
+-- use the following functions whenever you declare 'ConvertSuccess'/'ConvertAttempt'
 -- instance and you should be good.
 
 -- | An appropriate 'toObject' function for any types x and y which have a
--- 'ToScalar' x y instance.
-scalarToObject :: ToScalar x y => x -> Object k y
-scalarToObject = Scalar . toScalar
+-- 'ConvertSuccess' x y instance.
+scalarToObject :: ConvertSuccess x y => x -> Object k y
+scalarToObject = Scalar . convertSuccess
 
 -- | An appropriate 'fromObject' function for any types x and y which have a
--- 'FromScalar' x y instance.
-scalarFromObject :: FromScalar x y => Object k y -> Attempt x
-scalarFromObject = fromScalar <=< getScalar
+-- 'ConvertAttempt' x y instance.
+scalarFromObject :: ConvertAttempt y x => Object k y -> Attempt x
+scalarFromObject = convertAttempt <=< getScalar

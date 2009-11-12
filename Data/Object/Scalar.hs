@@ -26,6 +26,7 @@ import Data.Object.Raw
 import System.Locale (defaultTimeLocale)
 import Data.Time.Format (formatTime)
 import Data.Attempt
+import Data.Convertible
 
 data Scalar = Numeric   Rational
             | Text      Text
@@ -36,16 +37,18 @@ data Scalar = Numeric   Rational
 
 type ScalarObject = Object String Scalar
 
-instance ToScalar Scalar Raw where
-    toScalar (Numeric n) = toScalar $ show n
-    toScalar (Text t) = toScalar $ encodeUtf8 t
-    toScalar (Binary b) = toScalar b
-    toScalar (Bool True) = toScalar "true"
-    toScalar (Bool False) = toScalar "false"
+instance ConvertAttempt Scalar Raw where
+    convertAttempt = return . convertSuccess
+instance ConvertSuccess Scalar Raw where
+    convertSuccess (Numeric n) = convertSuccess $ show n
+    convertSuccess (Text t) = convertSuccess $ encodeUtf8 t
+    convertSuccess (Binary b) = convertSuccess b
+    convertSuccess (Bool True) = convertSuccess "true"
+    convertSuccess (Bool False) = convertSuccess "false"
     -- this is W3 format for timestamps.
-    toScalar (Timestamp t) =
-        toScalar $ formatTime defaultTimeLocale "%FT%XZ" t
-    toScalar Null = toScalar empty
+    convertSuccess (Timestamp t) =
+        convertSuccess $ formatTime defaultTimeLocale "%FT%XZ" t
+    convertSuccess Null = convertSuccess empty
 
 -- | 'toObject' specialized for 'ScalarObject's
 toScalarObject :: ToObject a String Scalar => a -> ScalarObject
