@@ -32,6 +32,7 @@ import Control.Monad ((<=<))
 import Data.Ratio (Ratio)
 import Data.Attempt
 import Data.Generics
+import Control.Exception (Exception)
 
 -- | A thin wrapper around a lazy bytestring.
 newtype Raw = Raw { unRaw :: B.ByteString }
@@ -80,21 +81,23 @@ instance ListToRaw Char where
     listToRaw = Raw . toLazyByteString
 
 class ListFromRaw a where
-    listFromRaw :: MonadAttempt m => Raw -> m [a]
+    listFromRaw :: MonadFailure ExpectedSingleCharacter m => Raw -> m [a] -- FIXME rather ugly
 instance ListFromRaw a => FromScalar [a] Raw where
     fromScalar = listFromRaw
 instance ListFromRaw Char where
     listFromRaw = return . fromLazyByteString . unRaw
+
+data ExpectedSingleCharacter = ExpectedSingleCharacter String
+    deriving (Show, Typeable)
+instance Exception ExpectedSingleCharacter
 
 instance ToObject Char Raw Raw where
     toObject c = Scalar $ Raw $ toLazyByteString [c]
     listToObject = Scalar . Raw . toLazyByteString
 instance FromObject Char Raw Raw where
     fromObject = helper . fromLazyByteString . unRaw <=< getScalar where
-        helper :: MonadAttempt m => String -> m Char
         helper [x] = return x
-        helper x =
-            failureString $ "Excepting a single character, received: " ++ x
+        helper x = failure $ ExpectedSingleCharacter x
     listFromObject = fmap (fromLazyByteString . unRaw) . getScalar
 
 -- Day

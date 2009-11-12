@@ -68,7 +68,7 @@ import Data.Traversable
 import Data.Monoid
 
 import Data.Generics
-import qualified Data.Attempt.Helper as A
+import qualified Safe.Failure as A
 import qualified Control.Exception as E
 import Data.Attempt
 
