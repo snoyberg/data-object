@@ -40,9 +40,9 @@ module Data.Object
     , mapKeysValuesM
       -- * Extracting underlying values
     , ObjectExtractError (..)
-    , getScalar
-    , getSequence
-    , getMapping
+    , fromScalar
+    , fromSequence
+    , fromMapping
       -- * Higher level conversions
     , ToObject (..)
     , FromObject (..)
@@ -172,21 +172,21 @@ instance E.Exception ObjectExtractError
 
 -- | Extra a scalar from the input, failing if the input is a sequence or
 -- mapping.
-getScalar :: Object k v -> Attempt v
-getScalar (Scalar s) = return s
-getScalar _ = failure ExpectedScalar
+fromScalar :: Object k v -> Attempt v
+fromScalar (Scalar s) = return s
+fromScalar _ = failure ExpectedScalar
 
 -- | Extra a sequence from the input, failing if the input is a scalar or
 -- mapping.
-getSequence :: Object k v -> Attempt [Object k v]
-getSequence (Sequence s) = return s
-getSequence _ = failure ExpectedSequence
+fromSequence :: Object k v -> Attempt [Object k v]
+fromSequence (Sequence s) = return s
+fromSequence _ = failure ExpectedSequence
 
 -- | Extra a mapping from the input, failing if the input is a scalar or
 -- sequence.
-getMapping :: Object k v -> Attempt [(k, Object k v)]
-getMapping (Mapping m) = return m
-getMapping _ = failure ExpectedMapping
+fromMapping :: Object k v -> Attempt [(k, Object k v)]
+fromMapping (Mapping m) = return m
+fromMapping _ = failure ExpectedMapping
 
 -- | Something which can be converted from a to 'Object' k v with guaranteed
 -- success. A somewhat unusual but very simple example would be:
@@ -286,7 +286,7 @@ class FromObject a k v where
     fromObject :: Object k v -> Attempt a
 
     listFromObject :: Object k v -> Attempt [a]
-    listFromObject = mapM fromObject <=< getSequence
+    listFromObject = mapM fromObject <=< fromSequence
 
     -- FIXME is this actually necesary?
     mapFromObject :: ConvertAttempt k k'
@@ -294,11 +294,7 @@ class FromObject a k v where
                   -> Attempt [(k', a)]
     mapFromObject =
         mapM (runKleisli (Kleisli convertAttempt *** Kleisli fromObject))
-         <=< getMapping
-
--- Identities for To/ConvertAttempt
-instance ConvertSuccess k k where convertSuccess = id
-instance ConvertAttempt k k where convertAttempt = return
+         <=< fromMapping
 
 -- Converting between different types of Objects
 instance (ConvertSuccess k k', ConvertSuccess v v') => ToObject (Object k v) k' v' where
@@ -326,7 +322,7 @@ instance (ConvertAttempt k' k, FromObject v k' v') => FromObject (k, v) k' v' wh
             _ -> failureString "fromObject of pair requires mapping of size 1"
     listFromObject =
         mapM (runKleisli (Kleisli convertAttempt *** Kleisli fromObject))
-        <=< getMapping
+        <=< fromMapping
 
 -- | An equivalent of 'lookup' to deal specifically with maps of 'Object's. In
 -- particular, it will:
@@ -370,4 +366,4 @@ scalarToObject = Scalar . convertSuccess
 -- | An appropriate 'fromObject' function for any types x and y which have a
 -- 'ConvertAttempt' x y instance.
 scalarFromObject :: ConvertAttempt y x => Object k y -> Attempt x
-scalarFromObject = convertAttempt <=< getScalar
+scalarFromObject = convertAttempt <=< fromScalar

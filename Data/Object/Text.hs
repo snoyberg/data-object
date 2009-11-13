@@ -98,10 +98,10 @@ instance ToObject Char LT.Text LT.Text where
     toObject c = Scalar $ LT.pack [c]
     listToObject = Scalar . LT.pack
 instance FromObject Char LT.Text LT.Text where
-    fromObject = helper . LT.unpack <=< getScalar where
+    fromObject = helper . LT.unpack <=< fromScalar where
         helper [x] = return x
         helper x = failure $ ExpectedSingleCharacter x
-    listFromObject = fmap LT.unpack . getScalar
+    listFromObject = fmap LT.unpack . fromScalar
 
 -- Day
 instance ConvertSuccess Day LT.Text where
