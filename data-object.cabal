@@ -28,7 +28,7 @@ library
                      attempt,
                      convertible >= 1.0.6
     exposed-modules: Data.Object
-                     Data.Object.Raw
+                     Data.Object.Text
                      Data.Object.Scalar
                      Data.Object.String
     ghc-options:     -Wall
