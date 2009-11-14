@@ -1,5 +1,6 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
 ---------------------------------------------------------
 --
 -- Module        : Data.Object.Scalar
@@ -19,7 +20,6 @@ module Data.Object.Scalar
 
 import Data.ByteString.Lazy (ByteString, empty)
 import Data.Text.Lazy (Text)
-import Data.Text.Lazy.Encoding (encodeUtf8)
 import Data.Time.Clock (UTCTime)
 import Data.Object
 import Data.Object.Text ()
@@ -41,7 +41,7 @@ instance ConvertAttempt Scalar Text where
     convertAttempt = return . convertSuccess
 instance ConvertSuccess Scalar Text where
     convertSuccess (Numeric n) = convertSuccess $ show n
-    convertSuccess (Text t) = convertSuccess $ encodeUtf8 t
+    convertSuccess (Text t) = t
     convertSuccess (Binary b) = convertSuccess b
     convertSuccess (Bool True) = convertSuccess "true"
     convertSuccess (Bool False) = convertSuccess "false"
@@ -49,6 +49,21 @@ instance ConvertSuccess Scalar Text where
     convertSuccess (Timestamp t) =
         convertSuccess $ formatTime defaultTimeLocale "%FT%XZ" t
     convertSuccess Null = convertSuccess empty
+
+instance ConvertAttempt Text Scalar where
+    convertAttempt = return . convertSuccess
+instance ConvertSuccess Text Scalar where
+    convertSuccess = Text -- FIXME this should be more intelligent
+
+instance ToObject (Object String Scalar) Text Text where
+    toObject = mapKeysValues convertSuccess convertSuccess
+instance FromObject (Object String Scalar) Text Text where
+   fromObject = return . toObject
+
+instance ToObject (Object Text Text) [Char] Scalar where
+    toObject = mapKeysValues convertSuccess convertSuccess
+instance FromObject (Object Text Text) [Char] Scalar where
+   fromObject = return . toObject
 
 -- | 'toObject' specialized for 'ScalarObject's
 toScalarObject :: ToObject a String Scalar => a -> ScalarObject

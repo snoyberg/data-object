@@ -74,21 +74,23 @@ instance FromObject BS.ByteString a LT.Text where
 
 -- Chars (and thereby strings)
 -- Extra complication since we're avoiding overlapping instances.
-class ListToRaw a where
-    listToRaw :: [a] -> LT.Text
-instance ListToRaw a => ConvertAttempt [a] LT.Text where
+class ListToText a where
+    listToText :: [a] -> LT.Text
+instance ListToText a => ConvertAttempt [a] LT.Text where
     convertAttempt = return . convertSuccess
-instance ListToRaw a => ConvertSuccess [a] LT.Text where
-    convertSuccess = listToRaw
-instance ListToRaw Char where
-    listToRaw = LT.pack
+instance ListToText a => ConvertSuccess [a] LT.Text where
+    convertSuccess = listToText
+instance ListToText Char where
+    listToText = LT.pack
 
-class ListFromRaw a where
-    listFromRaw :: MonadFailure ExpectedSingleCharacter m => LT.Text -> m [a] -- FIXME rather ugly
-instance ListFromRaw a => ConvertAttempt LT.Text [a] where
-    convertAttempt = listFromRaw
-instance ListFromRaw Char where
-    listFromRaw = return . LT.unpack
+class ListFromText a where
+    listFromText :: LT.Text -> [a]
+instance ListFromText a => ConvertSuccess LT.Text [a] where
+    convertSuccess = listFromText
+instance ListFromText a => ConvertAttempt LT.Text [a] where
+    convertAttempt = return . convertSuccess
+instance ListFromText Char where
+    listFromText = LT.unpack
 
 data ExpectedSingleCharacter = ExpectedSingleCharacter String
     deriving (Show, Typeable)
