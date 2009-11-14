@@ -288,7 +288,8 @@ class FromObject a k v where
     listFromObject :: Object k v -> Attempt [a]
     listFromObject = mapM fromObject <=< fromSequence
 
-    -- FIXME is this actually necesary?
+    -- | This isn't useful for any of the instances we define here, but
+    -- other users may find uses for it.
     mapFromObject :: ConvertAttempt k k'
                   => Object k v
                   -> Attempt [(k', a)]
@@ -296,6 +297,9 @@ class FromObject a k v where
         mapM (runKleisli (Kleisli convertAttempt *** Kleisli fromObject))
          <=< fromMapping
 
+-- The following code seems too generic and will probably lead to overlapping
+-- instances. It has thus been commented out.
+{-
 -- Converting between different types of Objects
 instance (ConvertSuccess k k', ConvertSuccess v v') => ToObject (Object k v) k' v' where
     toObject = mapKeysValues convertSuccess convertSuccess
@@ -303,6 +307,7 @@ instance (ConvertSuccess k k', ConvertSuccess v v') => ToObject (Object k v) k' 
 instance (ConvertAttempt k' k, ConvertAttempt v' v)
   => FromObject (Object k v) k' v' where
     fromObject = mapKeysValuesM convertAttempt convertAttempt
+-}
 
 -- Sequence
 instance ToObject a k v => ToObject [a] k v where
