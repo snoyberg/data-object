@@ -27,7 +27,12 @@ module Data.Object.String
 
 import Data.Object
 import Data.Attempt
+
+import Data.Convertible
 import Data.Convertible.Instances.String ()
+
+import Data.Time.Calendar
+import Data.Ratio (Ratio)
 
 type StringObject = Object String String
 
@@ -40,3 +45,15 @@ fromStringObject :: FromObject a String String
                  => StringObject
                  -> Attempt a
 fromStringObject = fromObject
+
+instance ToObject Char [Char] [Char] where
+    toObject = Scalar . return
+    listToObject = Scalar
+instance ToObject Day [Char] [Char] where
+    toObject = Scalar . convertSuccess
+instance ToObject Int [Char] [Char] where
+    toObject = Scalar . convertSuccess
+instance ToObject (Ratio Integer) [Char] [Char] where
+    toObject = Scalar . convertSuccess
+instance ToObject Bool [Char] [Char] where
+    toObject = Scalar . convertSuccess
