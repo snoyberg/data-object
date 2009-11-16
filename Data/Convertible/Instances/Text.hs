@@ -14,6 +14,8 @@
 --
 ---------------------------------------------------------
 
+-- | Instances to convert amongst 'String's, strict bytestrings, lazy
+-- bytestrings, strict text and lazy text.
 module Data.Convertible.Instances.Text () where
 
 import Data.Convertible

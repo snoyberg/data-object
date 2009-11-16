@@ -24,10 +24,12 @@ library
                      old-locale >= 1,
                      syb,
                      attempt,
-                     convertible >= 1.2.0
+                     convertible >= 1.2.0,
+                     control-monad-failure >= 0.4
     exposed-modules: Data.Object
                      Data.Object.Text
                      Data.Object.Scalar
                      Data.Object.String
                      Data.Convertible.Instances.Text
+                     Data.Convertible.Instances.String
     ghc-options:     -Wall
