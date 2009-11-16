@@ -2,7 +2,6 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE DeriveDataTypeable #-}
-{-# OPTIONS_GHC -fno-warn-orphans #-}
 ---------------------------------------------------------
 --
 -- Module        : Data.Object.Text
@@ -28,9 +27,7 @@ import qualified Data.Text.Lazy as LT
 import qualified Data.Text.Lazy.Encoding as LTE
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.ByteString as BS
-import Data.ByteString.Class
 import Data.Time.Calendar
-import Safe (readMay)
 import Control.Monad ((<=<))
 import Data.Ratio (Ratio)
 import Data.Attempt
@@ -42,55 +39,15 @@ import qualified Safe.Failure as SF
 -- | 'Object's with keys and values of type 'LT.Text'.
 type TextObject = Object LT.Text LT.Text
 
--- lazy bytestrings
-instance ConvertSuccess BL.ByteString LT.Text where
-    convertSuccess = LTE.decodeUtf8
-instance ConvertAttempt BL.ByteString LT.Text where
-    convertAttempt = return . convertSuccess
-
-instance ConvertSuccess LT.Text BL.ByteString where
-    convertSuccess = LTE.encodeUtf8
-instance ConvertAttempt LT.Text BL.ByteString where
-    convertAttempt = return . convertSuccess
-
 instance ToObject BL.ByteString a LT.Text where
     toObject = scalarToObject
 instance FromObject BL.ByteString a LT.Text where
     fromObject = scalarFromObject
 
--- strict bytestrings
-instance ConvertSuccess BS.ByteString LT.Text where
-    convertSuccess = LTE.decodeUtf8 . toLazyByteString
-instance ConvertSuccess LT.Text BS.ByteString where
-    convertSuccess = fromLazyByteString . LTE.encodeUtf8
-instance ConvertAttempt BS.ByteString LT.Text where
-    convertAttempt = return . convertSuccess
-instance ConvertAttempt LT.Text BS.ByteString where
-    convertAttempt = return . convertSuccess
 instance ToObject BS.ByteString a LT.Text where
     toObject = scalarToObject
 instance FromObject BS.ByteString a LT.Text where
     fromObject = scalarFromObject
-
--- Chars (and thereby strings)
--- Extra complication since we're avoiding overlapping instances.
-class ListToText a where
-    listToText :: [a] -> LT.Text
-instance ListToText a => ConvertAttempt [a] LT.Text where
-    convertAttempt = return . convertSuccess
-instance ListToText a => ConvertSuccess [a] LT.Text where
-    convertSuccess = listToText
-instance ListToText Char where
-    listToText = LT.pack
-
-class ListFromText a where
-    listFromText :: LT.Text -> [a]
-instance ListFromText a => ConvertSuccess LT.Text [a] where
-    convertSuccess = listFromText
-instance ListFromText a => ConvertAttempt LT.Text [a] where
-    convertAttempt = return . convertSuccess
-instance ListFromText Char where
-    listFromText = LT.unpack
 
 data ExpectedSingleCharacter = ExpectedSingleCharacter String
     deriving (Show, Typeable)
@@ -112,20 +69,19 @@ instance ConvertAttempt Day LT.Text where
     convertAttempt = return . convertSuccess
 instance ToObject Day k LT.Text where
     toObject = scalarToObject
+
+data InvalidDayException = InvalidDayException String
+    deriving (Show, Typeable)
+instance Exception InvalidDayException
 instance ConvertAttempt LT.Text Day where
-    convertAttempt t = do -- FIXME
+    convertAttempt t = do
         let s = LT.unpack t
-        if length s /= 10
-            then failureString ("Invalid day: " ++ s)
-            else do
-                let x = do
-                    y' <- readMay $ take 4 s
-                    m' <- readMay $ take 2 $ drop 5 s
-                    d' <- readMay $ take 2 $ drop 8 s
-                    return (y', m', d')
-                case x of
-                    Just (y, m, d) -> return $ fromGregorian y m d
-                    Nothing -> failureString $ "Invalid day: " ++ s
+        SF.assert (length s == 10) () $ InvalidDayException s
+        wrapFailure (const $ InvalidDayException s) $ do
+            y <- SF.read $ take 4 s
+            m <- SF.read $ take 2 $ drop 5 s
+            d <- SF.read $ take 2 $ drop 8 s
+            return $ fromGregorian y m d
 instance FromObject Day k LT.Text where
     fromObject = scalarFromObject
 

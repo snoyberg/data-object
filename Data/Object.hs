@@ -52,6 +52,8 @@ module Data.Object
       -- $scalarToFromObject
     , scalarToObject
     , scalarFromObject
+      -- Instances
+    , module Data.Convertible.Instances.Text
     ) where
 
 import Control.Arrow
@@ -70,6 +72,7 @@ import qualified Control.Exception as E
 import Data.Attempt
 
 import Data.Convertible
+import Data.Convertible.Instances.Text
 
 -- | Can represent nested values as scalars, sequences and mappings.  A
 -- sequence is synonymous with a list, while a mapping is synonymous with a
@@ -228,7 +231,8 @@ class ToObject a k v where
     listToObject :: [a] -> Object k v
     listToObject = Sequence . map toObject
 
-    -- FIXME is this actually necesary?
+    -- | This isn't useful for any of the instances we define here, but
+    -- other users may find uses for it.
     mapToObject :: ConvertSuccess k' k => [(k', a)] -> Object k v
     mapToObject = Mapping . map (convertSuccess *** toObject)
 
@@ -297,11 +301,18 @@ class FromObject a k v where
         mapM (runKleisli (Kleisli convertAttempt *** Kleisli fromObject))
          <=< fromMapping
 
+-- Object identity conversions
+instance ToObject (Object k v) k v where
+    toObject = id
+instance FromObject (Object k v) k v where
+    fromObject = return
+
 -- The following code seems too generic and will probably lead to overlapping
 -- instances. It has thus been commented out.
 {-
 -- Converting between different types of Objects
-instance (ConvertSuccess k k', ConvertSuccess v v') => ToObject (Object k v) k' v' where
+instance (ConvertSuccess k k', ConvertSuccess v v')
+  => ToObject (Object k v) k' v' where
     toObject = mapKeysValues convertSuccess convertSuccess
 
 instance (ConvertAttempt k' k, ConvertAttempt v' v)
