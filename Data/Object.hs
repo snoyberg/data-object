@@ -1,6 +1,8 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE ExistentialQuantification #-}
 ---------------------------------------------------------
 --
 -- Module        : Data.Object
@@ -46,6 +48,9 @@ module Data.Object
       -- * Higher level conversions
     , ToObject (..)
     , FromObject (..)
+      -- ** Wrapping 'FromObject'
+    , FromObjectException (..)
+    , fromObjectWrap
       -- * Helper functions
     , lookupObject
       -- ** Scalar/Object conversions
@@ -68,7 +73,7 @@ import Data.Monoid
 
 import Data.Generics
 import qualified Safe.Failure as A
-import qualified Control.Exception as E
+import Control.Exception (Exception)
 import Data.Attempt
 
 import Data.Convertible
@@ -171,7 +176,7 @@ data ObjectExtractError =
     | ExpectedSequence
     | ExpectedMapping
     deriving (Typeable, Show)
-instance E.Exception ObjectExtractError
+instance Exception ObjectExtractError
 
 -- | Extra a scalar from the input, failing if the input is a sequence or
 -- mapping.
@@ -339,6 +344,19 @@ instance (ConvertAttempt k' k, FromObject v k' v') => FromObject (k, v) k' v' wh
     listFromObject =
         mapM (runKleisli (Kleisli convertAttempt *** Kleisli fromObject))
         <=< fromMapping
+
+-- | Wraps any 'Exception' thrown during a 'fromObject' call.
+data FromObjectException = forall e. Exception e => FromObjectException e
+    deriving Typeable
+instance Show FromObjectException where
+    show (FromObjectException e) = "FromObjectException " ++ show e
+instance Exception FromObjectException
+
+-- | Calls 'fromObject' and wraps any 'Exception's in a 'FromObjectException'.
+fromObjectWrap :: (FromObject x k y, MonadFailure FromObjectException m)
+               => Object k y
+               -> m x
+fromObjectWrap = attempt (failure . FromObjectException) return . fromObject
 
 -- | An equivalent of 'lookup' to deal specifically with maps of 'Object's. In
 -- particular, it will:

@@ -19,6 +19,7 @@ module Data.Object.Text
     ( TextObject
     , toTextObject
     , fromTextObject
+    , Text
     ) where
 
 import Data.Object
@@ -30,6 +31,9 @@ import Data.Convertible.Instances.String ()
 
 import Data.Time.Calendar
 import Data.Ratio (Ratio)
+
+import Data.Typeable (Typeable)
+import Control.Exception (Exception)
 
 -- | 'Object's with keys and values of type 'LT.Text'.
 type TextObject = Object Text Text
@@ -56,3 +60,17 @@ instance ToObject (Ratio Integer) Text Text where
     toObject = Scalar . convertSuccess
 instance ToObject Bool Text Text where
     toObject = Scalar . convertSuccess
+
+newtype ExpectedCharException = ExpectedCharException String
+    deriving (Show, Typeable)
+instance Exception ExpectedCharException
+instance FromObject Char Text Text where
+    fromObject o = do
+        x <- fromScalar o
+        let y = convertSuccess x
+        case y of
+            [c] -> return c
+            _ -> failure $ ExpectedCharException y
+    listFromObject o = do
+        x <- fromScalar o
+        return $ convertSuccess x
