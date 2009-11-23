@@ -57,8 +57,6 @@ module Data.Object
       -- $scalarToFromObject
     , scalarToObject
     , scalarFromObject
-      -- Instances
-    , module Data.Convertible.Instances.Text
     ) where
 
 import Control.Arrow
@@ -77,7 +75,6 @@ import Control.Exception (Exception)
 import Data.Attempt
 
 import Data.Convertible
-import Data.Convertible.Instances.Text
 
 -- | Can represent nested values as scalars, sequences and mappings.  A
 -- sequence is synonymous with a list, while a mapping is synonymous with a

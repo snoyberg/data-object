@@ -30,6 +30,4 @@ library
                      Data.Object.Text
                      Data.Object.Scalar
                      Data.Object.String
-                     Data.Convertible.Instances.Text
-                     Data.Convertible.Instances.String
     ghc-options:     -Wall

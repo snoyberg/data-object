@@ -29,7 +29,6 @@ import Data.Object
 import Data.Attempt
 
 import Data.Convertible
-import Data.Convertible.Instances.String ()
 
 import Data.Time.Calendar
 import Data.Ratio (Ratio)
