@@ -33,6 +33,7 @@ import Data.Ratio (Ratio)
 
 import Data.Typeable (Typeable)
 import Control.Exception (Exception)
+import Control.Monad ((<=<))
 
 -- | 'Object's with keys and values of type 'LT.Text'.
 type TextObject = Object Text Text
@@ -73,3 +74,6 @@ instance FromObject Char Text Text where
     listFromObject o = do
         x <- fromScalar o
         return $ convertSuccess x
+
+instance FromObject Day Text Text where
+    fromObject = convertAttempt <=< fromScalar
