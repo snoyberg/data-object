@@ -26,7 +26,7 @@ import Data.Object
 import Data.Text.Lazy (Text)
 import Data.Attempt
 
-import Data.Convertible
+import Data.Convertible.Text
 
 import Data.Time.Calendar
 import Data.Ratio (Ratio)
@@ -37,6 +37,10 @@ import Control.Monad ((<=<))
 
 -- | 'Object's with keys and values of type 'LT.Text'.
 type TextObject = Object Text Text
+instance ToObject Text Text Text where
+    toObject = Scalar
+instance FromObject Text Text Text where
+    fromObject = fromScalar
 
 -- | 'toObject' specialized for 'TextObject's
 toTextObject :: ToObject a Text Text => a -> TextObject
@@ -76,4 +80,6 @@ instance FromObject Char Text Text where
         return $ convertSuccess x
 
 instance FromObject Day Text Text where
+    fromObject = convertAttempt <=< fromScalar
+instance FromObject Int Text Text where
     fromObject = convertAttempt <=< fromScalar

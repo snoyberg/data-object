@@ -74,7 +74,7 @@ import qualified Safe.Failure as A
 import Control.Exception (Exception)
 import Data.Attempt
 
-import Data.Convertible
+import Data.Convertible.Text
 
 -- | Can represent nested values as scalars, sequences and mappings.  A
 -- sequence is synonymous with a list, while a mapping is synonymous with a
@@ -177,19 +177,23 @@ instance Exception ObjectExtractError
 
 -- | Extra a scalar from the input, failing if the input is a sequence or
 -- mapping.
-fromScalar :: Object k v -> Attempt v
+fromScalar :: MonadFailure ObjectExtractError m => Object k v -> m v
 fromScalar (Scalar s) = return s
 fromScalar _ = failure ExpectedScalar
 
 -- | Extra a sequence from the input, failing if the input is a scalar or
 -- mapping.
-fromSequence :: Object k v -> Attempt [Object k v]
+fromSequence :: MonadFailure ObjectExtractError m
+             => Object k v
+             -> m [Object k v]
 fromSequence (Sequence s) = return s
 fromSequence _ = failure ExpectedSequence
 
 -- | Extra a mapping from the input, failing if the input is a scalar or
 -- sequence.
-fromMapping :: Object k v -> Attempt [(k, Object k v)]
+fromMapping :: MonadFailure ObjectExtractError m
+            => Object k v
+            -> m [(k, Object k v)]
 fromMapping (Mapping m) = return m
 fromMapping _ = failure ExpectedMapping
 

@@ -28,7 +28,7 @@ module Data.Object.String
 import Data.Object
 import Data.Attempt
 
-import Data.Convertible
+import Data.Convertible.Text
 
 import Data.Time.Calendar
 import Data.Ratio (Ratio)
