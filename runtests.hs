@@ -1,6 +1,11 @@
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 
 import Data.Object
+import Data.Object.Text
+import Data.Attempt
+import Data.Convertible.Text
 
 import Test.Framework (defaultMain, testGroup, Test)
 --import Test.Framework.Providers.HUnit
@@ -16,14 +21,19 @@ main = defaultMain
 testSuite :: Test
 testSuite = testGroup "Data.Object"
     [ testProperty "propMapKeysValuesId" propMapKeysValuesId
-    , testProperty "propToFromRawObject" propToFromRawObject
+    , testProperty "propToFromTextObject" propToFromTextObject
     ]
 
 propMapKeysValuesId :: Object Int Int -> Bool
 propMapKeysValuesId o = mapKeysValues id id o == o
 
-propToFromRawObject :: Object Int Int -> Bool
-propToFromRawObject o = fromRawObject (toRawObject o) == Just o
+instance FromObject (Object Int Int) Text Text where
+    fromObject = mapKeysValuesM convertAttempt convertAttempt
+instance ToObject (Object Int Int) Text Text where
+    toObject = mapKeysValues convertSuccess convertSuccess
+
+propToFromTextObject :: Object Int Int -> Bool
+propToFromTextObject o = fa (fromTextObject (toTextObject o)) == Just o
 
 instance Arbitrary (Object Int Int) where
     coarbitrary = undefined

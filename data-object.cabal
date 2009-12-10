@@ -15,7 +15,15 @@ cabal-version:   >= 1.2
 build-type:      Simple
 homepage:        http://github.com/snoyberg/data-object/tree/master
 
+flag buildtests
+  description: Build the executable to run unit tests
+  default: False
+
 library
+    if flag(buildtests)
+        Buildable: False
+    else
+        Buildable: True
     build-depends:   base >= 4 && < 5,
                      bytestring >= 0.9.1.4 && < 1,
                      text >= 0.5 && < 0.6,
@@ -30,3 +38,17 @@ library
                      Data.Object.Scalar
                      Data.Object.String
     ghc-options:     -Wall
+
+executable           runtests
+    if flag(buildtests)
+        Buildable: True
+        cpp-options:     -DTEST
+        build-depends:   test-framework,
+                         test-framework-quickcheck,
+                         test-framework-hunit,
+                         HUnit,
+                         QuickCheck >= 1 && < 2
+    else
+        Buildable: False
+    ghc-options:     -Wall
+    main-is:         runtests.hs
