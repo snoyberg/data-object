@@ -35,6 +35,9 @@ import Data.Typeable (Typeable)
 import Control.Exception (Exception)
 import Control.Monad ((<=<))
 
+import qualified Data.ByteString as BS
+import qualified Data.ByteString.Lazy as BL
+
 -- | 'Object's with keys and values of type 'LT.Text'.
 type TextObject = Object Text Text
 instance ToObject Text Text Text where
@@ -83,3 +86,13 @@ instance FromObject Day Text Text where
     fromObject = convertAttempt <=< fromScalar
 instance FromObject Int Text Text where
     fromObject = convertAttempt <=< fromScalar
+
+instance ToObject BL.ByteString Text Text where
+    toObject = Scalar . convertSuccess
+instance FromObject BL.ByteString Text Text where
+    fromObject = fmap convertSuccess . fromScalar
+
+instance ToObject BS.ByteString Text Text where
+    toObject = Scalar . convertSuccess
+instance FromObject BS.ByteString Text Text where
+    fromObject = fmap convertSuccess . fromScalar
