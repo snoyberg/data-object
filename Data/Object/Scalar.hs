@@ -16,13 +16,13 @@ module Data.Object.Scalar
     , ScalarObject
     , toScalarObject
     , fromScalarObject
+    , module Data.Object.Base
     ) where
 
 import Data.ByteString.Lazy (ByteString, empty)
-import Data.Text.Lazy (Text)
 import Data.Time.Clock (UTCTime)
-import Data.Object
-import Data.Object.Text ()
+import Data.Object.Text
+import Data.Object.Base
 import System.Locale (defaultTimeLocale)
 import Data.Time.Format (formatTime)
 import Data.Attempt

@@ -21,9 +21,10 @@ module Data.Object.Text
     , fromTextObject
     , Text
     , ExpectedCharException (..)
+    , module Data.Object.Base
     ) where
 
-import Data.Object
+import Data.Object.Base
 import Data.Text.Lazy (Text)
 import Data.Attempt
 

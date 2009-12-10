@@ -19,10 +19,11 @@ module Data.Object.String
     ( StringObject
     , toStringObject
     , fromStringObject
+    , module Data.Object.Base
     ) where
 
-import Data.Object
-import Data.Object.Text (ExpectedCharException (..))
+import Data.Object.Base
+import Data.Object.Text
 import Data.Attempt
 import Control.Monad ((<=<))
 
