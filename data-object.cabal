@@ -38,6 +38,7 @@ library
                      Data.Object.Text
                      Data.Object.Scalar
                      Data.Object.String
+                     Data.Object.Dangerous
     ghc-options:     -Wall
 
 executable           runtests
