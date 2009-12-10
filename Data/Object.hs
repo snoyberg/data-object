@@ -80,9 +80,9 @@ import Data.Convertible.Text
 -- sequence is synonymous with a list, while a mapping is synonymous with a
 -- list of pairs.
 --
--- Note that instances of this data type for standard library type classes for
--- the most part leave the key untouched while altering the value. For example,
--- the 'Functor' instance defines 'fmap' to be synonymous with 'mapValues'.
+-- Note that instances of standard library type classes for this data type
+-- leave the key untouched while altering the value. For example, the 'Functor'
+-- instance defines 'fmap' to be synonymous with 'mapValues'.
 data Object key val =
     Mapping [(key, Object key val)]
     | Sequence [Object key val]
@@ -250,14 +250,14 @@ class ToObject a k v where
 --      instance FromObject [TestScore] String Int where
 --          {- Verbose, simple version
 --          fromObject o = do
---              objectPairs <- getMapping o
+--              objectPairs <- fromMapping o
 --              pairs <- mapM getScalarFromSecond objectPairs
 --              return $ map testScoreFromPair pairs
 --              where
 --                  getScalarFromSecond :: (k, Object k v)
 --                                      -> Attempt (k, v)
 --                  getScalarFromSecond (k, v) = do
---                      v' <- getScalar v
+--                      v' <- fromScalar v
 --                      return (k, v')
 --                  testScoreFromPair :: (String, Int) -> TestScore
 --                  testScoreFromPair (n, s) = TestScore n s
@@ -265,11 +265,11 @@ class ToObject a k v where
 --          {- Complicated, short version
 --          fromObject =
 --              mapM (fmap (uncurry TestScore)
---                   . runKleisli (second $ Kleisli getScalar))
---              <=< getMapping
+--                   . runKleisli (second $ Kleisli `fromScalar`))
+--              <=< `fromMapping`
 --          -}
 --          {- And this is just cheating -}
---          fromObject o = map (uncurry TestScore) `fmap` fromObject o
+--          fromObject o = map (uncurry TestScore) \``fmap`\` fromObject o
 -- @
 --
 -- Hopefully this example demonstrates how powerful an idea fromObject can be.

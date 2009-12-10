@@ -1,7 +1,6 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE TypeSynonymInstances #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 ---------------------------------------------------------
 --
@@ -16,9 +15,6 @@
 -- Objects with 'String's for keys and values.
 ---------------------------------------------------------
 
--- | This module makes all instances of 'ToObject' and 'FromObject' for
--- 'LT.Text' into instances for 'String'. It does so by allowing overlapping
--- instances: caveat emptor!
 module Data.Object.String
     ( StringObject
     , toStringObject
@@ -26,7 +22,9 @@ module Data.Object.String
     ) where
 
 import Data.Object
+import Data.Object.Text (ExpectedCharException (..))
 import Data.Attempt
+import Control.Monad ((<=<))
 
 import Data.Convertible.Text
 
@@ -56,3 +54,19 @@ instance ToObject (Ratio Integer) [Char] [Char] where
     toObject = Scalar . convertSuccess
 instance ToObject Bool [Char] [Char] where
     toObject = Scalar . convertSuccess
+
+instance FromObject Char [Char] [Char] where
+    fromObject o = do
+        x <- fromScalar o
+        case x of
+            [c] -> return c
+            _ -> failure $ ExpectedCharException x
+    listFromObject = fromScalar
+instance FromObject Day [Char] [Char] where
+    fromObject = convertAttempt <=< fromScalar
+instance FromObject Int [Char] [Char] where
+    fromObject = convertAttempt <=< fromScalar
+instance FromObject (Ratio Integer) [Char] [Char] where
+    fromObject = convertAttempt <=< fromScalar
+instance FromObject Bool [Char] [Char] where
+    fromObject = convertAttempt <=< fromScalar

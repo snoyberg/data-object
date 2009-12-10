@@ -20,6 +20,7 @@ module Data.Object.Text
     , toTextObject
     , fromTextObject
     , Text
+    , ExpectedCharException (..)
     ) where
 
 import Data.Object
@@ -38,7 +39,7 @@ import Control.Monad ((<=<))
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as BL
 
--- | 'Object's with keys and values of type 'LT.Text'.
+-- | 'Object's with keys and values of type 'Text'.
 type TextObject = Object Text Text
 instance ToObject Text Text Text where
     toObject = Scalar
@@ -85,6 +86,10 @@ instance FromObject Char Text Text where
 instance FromObject Day Text Text where
     fromObject = convertAttempt <=< fromScalar
 instance FromObject Int Text Text where
+    fromObject = convertAttempt <=< fromScalar
+instance FromObject (Ratio Integer) Text Text where
+    fromObject = convertAttempt <=< fromScalar
+instance FromObject Bool Text Text where
     fromObject = convertAttempt <=< fromScalar
 
 instance ToObject BL.ByteString Text Text where
