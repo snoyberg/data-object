@@ -2,6 +2,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE TypeSynonymInstances #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 ---------------------------------------------------------
 --
@@ -20,7 +21,6 @@ module Data.Object.Text
     , toTextObject
     , fromTextObject
     , Text
-    , ExpectedCharException (..)
     , module Data.Object.Base
     ) where
 
@@ -33,8 +33,6 @@ import Data.Convertible.Text
 import Data.Time.Calendar
 import Data.Ratio (Ratio)
 
-import Data.Typeable (Typeable)
-import Control.Exception (Exception)
 import Control.Monad ((<=<))
 
 import qualified Data.ByteString as BS
@@ -55,12 +53,11 @@ toTextObject = toObject
 fromTextObject :: FromObject a Text Text => TextObject -> Attempt a
 fromTextObject = fromObject
 
-instance ToObject (Object [Char] [Char]) Text Text where
+instance ToObject (Object String String) Text Text where
     toObject = mapKeysValues convertSuccess convertSuccess
 
-instance ToObject Char Text Text where
-    toObject c = Scalar $ convertSuccess [c]
-    listToObject = Scalar . convertSuccess
+instance ToObject String Text Text where
+    toObject = Scalar . cs
 instance ToObject Day Text Text where
     toObject = Scalar . convertSuccess
 instance ToObject Int Text Text where
@@ -70,20 +67,8 @@ instance ToObject (Ratio Integer) Text Text where
 instance ToObject Bool Text Text where
     toObject = Scalar . convertSuccess
 
-newtype ExpectedCharException = ExpectedCharException String
-    deriving (Show, Typeable)
-instance Exception ExpectedCharException
-instance FromObject Char Text Text where
-    fromObject o = do
-        x <- fromScalar o
-        let y = convertSuccess x
-        case y of
-            [c] -> return c
-            _ -> failure $ ExpectedCharException y
-    listFromObject o = do
-        x <- fromScalar o
-        return $ convertSuccess x
-
+instance FromObject String Text Text where
+    fromObject = convertAttempt <=< fromScalar
 instance FromObject Day Text Text where
     fromObject = convertAttempt <=< fromScalar
 instance FromObject Int Text Text where

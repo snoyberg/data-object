@@ -230,14 +230,6 @@ fromMapping _ = failure ExpectedMapping
 class ToObject a k v where
     toObject :: a -> Object k v
 
-    listToObject :: [a] -> Object k v
-    listToObject = Sequence . map toObject
-
-    -- | This isn't useful for any of the instances we define here, but
-    -- other users may find uses for it.
-    mapToObject :: ConvertSuccess k' k => [(k', a)] -> Object k v
-    mapToObject = Mapping . map (convertSuccess *** toObject)
-
 -- | Something which can attempt a conversion from 'Object' k v to a with a
 -- possibility of failure. To finish off with the example in 'ToObject':
 --
@@ -291,43 +283,42 @@ class ToObject a k v where
 class FromObject a k v where
     fromObject :: Object k v -> Attempt a
 
-    listFromObject :: Object k v -> Attempt [a]
-    listFromObject = mapM fromObject <=< fromSequence
+-- Scalar
+instance ToObject v k v where
+    toObject = Scalar
+instance FromObject v k v where
+    fromObject = fromScalar
 
-    -- | This isn't useful for any of the instances we define here, but
-    -- other users may find uses for it.
-    mapFromObject :: ConvertAttempt k k'
-                  => Object k v
-                  -> Attempt [(k', a)]
-    mapFromObject =
-        mapM (runKleisli (Kleisli convertAttempt *** Kleisli fromObject))
-         <=< fromMapping
+-- Sequence
+instance ToObject [v] k v where
+    toObject = Sequence . map Scalar
+instance FromObject [v] k v where
+    fromObject = mapM fromScalar <=< fromSequence
 
--- Object identity conversions
+-- Mapping
+instance ToObject [(k, v)] k v where
+    toObject = Mapping . map (second Scalar)
+instance FromObject [(k, v)] k v where
+    fromObject =
+        mapM (runKleisli (second (Kleisli fromScalar))) <=< fromMapping
+
+-- Object Scalar
 instance ToObject (Object k v) k v where
     toObject = id
 instance FromObject (Object k v) k v where
     fromObject = return
 
--- Sequence
-instance ToObject a k v => ToObject [a] k v where
-    toObject = listToObject
-instance FromObject a k v => FromObject [a] k v where
-    fromObject = listFromObject
+-- Object Sequence
+instance ToObject [Object k v] k v where
+    toObject = Sequence
+instance FromObject [Object k v] k v where
+    fromObject = fromSequence
 
--- Mapping
-instance (ConvertSuccess k k', ToObject v k' v') => ToObject (k, v) k' v' where
-    toObject = listToObject . return
-    listToObject = Mapping . map (convertSuccess *** toObject)
-instance (ConvertAttempt k' k, FromObject v k' v') => FromObject (k, v) k' v' where
-    fromObject o = do
-        ms <- listFromObject o
-        case ms of
-            [m] -> return m
-            _ -> failureString "fromObject of pair requires mapping of size 1"
-    listFromObject =
-        mapM (runKleisli (Kleisli convertAttempt *** Kleisli fromObject))
-        <=< fromMapping
+-- Object Mapping
+instance ToObject [(k, Object k v)] k v where
+    toObject = Mapping
+instance FromObject [(k, Object k v)] k v where
+    fromObject = fromMapping
 
 -- | Wraps any 'Exception' thrown during a 'fromObject' call.
 data FromObjectException = forall e. Exception e => FromObjectException e

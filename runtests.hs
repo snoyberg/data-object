@@ -2,7 +2,6 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
-import Data.Object
 import Data.Object.Text
 import Data.Attempt
 import Data.Convertible.Text
@@ -22,6 +21,7 @@ testSuite :: Test
 testSuite = testGroup "Data.Object"
     [ testProperty "propMapKeysValuesId" propMapKeysValuesId
     , testProperty "propToFromTextObject" propToFromTextObject
+    , testProperty "propStrings" propStrings
     ]
 
 propMapKeysValuesId :: Object Int Int -> Bool
@@ -41,3 +41,10 @@ instance Arbitrary (Object Int Int) where
         arbS = Scalar `fmap` (arbitrary :: Gen Int)
         arbL = Sequence `fmap` vector 2
         arbM = Mapping `fmap` vector 1
+
+instance Arbitrary Char where
+    coarbitrary = undefined
+    arbitrary = elements $ ['A'..'Z'] ++ ['a'..'z'] ++ ['0'..'9']
+
+propStrings :: String -> Bool
+propStrings s = fa (fromTextObject $ toTextObject s) == Just s

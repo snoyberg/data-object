@@ -1,6 +1,7 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE TypeSynonymInstances #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 ---------------------------------------------------------
 --
@@ -44,30 +45,24 @@ fromStringObject :: FromObject a String String
                  -> Attempt a
 fromStringObject = fromObject
 
-instance ToObject Char [Char] [Char] where
-    toObject = Scalar . return
-    listToObject = Scalar
-instance ToObject Day [Char] [Char] where
+instance ToObject String String String where
+    toObject = Scalar
+instance ToObject Day String String where
     toObject = Scalar . convertSuccess
-instance ToObject Int [Char] [Char] where
+instance ToObject Int String String where
     toObject = Scalar . convertSuccess
-instance ToObject (Ratio Integer) [Char] [Char] where
+instance ToObject (Ratio Integer) String String where
     toObject = Scalar . convertSuccess
-instance ToObject Bool [Char] [Char] where
+instance ToObject Bool String String where
     toObject = Scalar . convertSuccess
 
-instance FromObject Char [Char] [Char] where
-    fromObject o = do
-        x <- fromScalar o
-        case x of
-            [c] -> return c
-            _ -> failure $ ExpectedCharException x
-    listFromObject = fromScalar
-instance FromObject Day [Char] [Char] where
+instance FromObject String String String where
     fromObject = convertAttempt <=< fromScalar
-instance FromObject Int [Char] [Char] where
+instance FromObject Day String String where
     fromObject = convertAttempt <=< fromScalar
-instance FromObject (Ratio Integer) [Char] [Char] where
+instance FromObject Int String String where
     fromObject = convertAttempt <=< fromScalar
-instance FromObject Bool [Char] [Char] where
+instance FromObject (Ratio Integer) String String where
+    fromObject = convertAttempt <=< fromScalar
+instance FromObject Bool String String where
     fromObject = convertAttempt <=< fromScalar

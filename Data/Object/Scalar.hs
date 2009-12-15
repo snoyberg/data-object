@@ -1,6 +1,7 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE TypeSynonymInstances #-}
 ---------------------------------------------------------
 --
 -- Module        : Data.Object.Scalar
@@ -60,9 +61,9 @@ instance ToObject (Object String Scalar) Text Text where
 instance FromObject (Object String Scalar) Text Text where
    fromObject = return . toObject
 
-instance ToObject (Object Text Text) [Char] Scalar where
+instance ToObject (Object Text Text) String Scalar where
     toObject = mapKeysValues convertSuccess convertSuccess
-instance FromObject (Object Text Text) [Char] Scalar where
+instance FromObject (Object Text Text) String Scalar where
    fromObject = return . toObject
 
 -- | 'toObject' specialized for 'ScalarObject's

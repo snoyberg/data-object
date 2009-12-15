@@ -19,8 +19,12 @@ flag buildtests
   description: Build the executable to run unit tests
   default: False
 
+flag nolib
+  description: Skip building the library.
+  default: False
+
 library
-    if flag(buildtests)
+    if flag(nolib)
         Buildable: False
     else
         Buildable: True
@@ -38,7 +42,6 @@ library
                      Data.Object.Text
                      Data.Object.Scalar
                      Data.Object.String
-                     Data.Object.Dangerous
     ghc-options:     -Wall
 
 executable           runtests
