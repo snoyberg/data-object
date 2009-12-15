@@ -3,6 +3,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE ExistentialQuantification #-}
+{-# LANGUAGE OverlappingInstances #-}
 ---------------------------------------------------------
 --
 -- Module        : Data.Object.Base
@@ -40,6 +41,9 @@ module Data.Object.Base
     , mapKeysValues
     , mapKeysValuesA
     , mapKeysValuesM
+      -- * Convert entires objects
+    , convertObject
+    , convertObjectM
       -- * Extracting underlying values
     , ObjectExtractError (..)
     , fromScalar
@@ -51,6 +55,17 @@ module Data.Object.Base
       -- ** Wrapping 'FromObject'
     , FromObjectException (..)
     , fromObjectWrap
+      -- * Common object conversions
+    , sTO
+    , sFO
+    , lTO
+    , lFO
+    , mTO
+    , mFO
+    , olTO
+    , olFO
+    , omTO
+    , omFO
       -- * Helper functions
     , lookupObject
     ) where
@@ -161,6 +176,16 @@ mapKeysValuesM fk fv =
     let fk' = WrapMonad . fk
         fv' = WrapMonad . fv
      in unwrapMonad . mapKeysValuesA fk' fv'
+
+convertObject :: (ConvertSuccess k k', ConvertSuccess v v')
+              => Object k v
+              -> Object k' v'
+convertObject = mapKeysValues cs cs
+
+convertObjectM :: (ConvertAttempt k k', ConvertAttempt v v')
+               => Object k v
+               -> Attempt (Object k' v')
+convertObjectM = mapKeysValuesM ca ca
 
 -- | An error value returned when an unexpected node is encountered, eg you
 -- were expecting a 'Scalar' and found a 'Mapping'.
@@ -332,6 +357,48 @@ fromObjectWrap :: (FromObject x k y, MonadFailure FromObjectException m)
                => Object k y
                -> m x
 fromObjectWrap = attempt (failure . FromObjectException) return . fromObject
+
+sTO :: ConvertSuccess v v' => v -> Object k v'
+sTO = Scalar . cs
+
+sFO :: ConvertAttempt v' v => Object k v' -> Attempt v
+sFO = ca <=< fromScalar
+
+lTO :: ConvertSuccess v v' => [v] -> Object k v'
+lTO = Sequence . map (Scalar . cs)
+
+lFO :: ConvertAttempt v' v => Object k v' -> Attempt [v]
+lFO = mapM (ca <=< fromScalar) <=< fromSequence
+
+mTO :: (ConvertSuccess k k', ConvertSuccess v v')
+                => [(k, v)]
+                -> Object k' v'
+mTO = Mapping . map (cs *** Scalar . cs)
+
+mFO :: (ConvertAttempt k' k, ConvertAttempt v' v)
+                  => Object k' v'
+                  -> Attempt [(k, v)]
+mFO =
+    mapM (runKleisli (Kleisli ca *** Kleisli sFO))
+ <=< fromMapping
+
+olTO :: ToObject x k v => [x] -> Object k v
+olTO = Sequence . map toObject
+
+olFO :: FromObject x k v => Object k v -> Attempt [x]
+olFO = mapM fromObject <=< fromSequence
+
+omTO :: (ConvertSuccess k' k, ToObject x k v)
+                 => [(k', x)]
+                 -> Object k v
+omTO = Mapping . map (cs *** toObject)
+
+omFO :: (ConvertAttempt k k', FromObject x k v)
+                   => Object k v
+                   -> Attempt [(k', x)]
+omFO =
+      mapM (runKleisli (Kleisli ca *** Kleisli fromObject))
+  <=< fromMapping
 
 -- | An equivalent of 'lookup' to deal specifically with maps of 'Object's. In
 -- particular, it will:

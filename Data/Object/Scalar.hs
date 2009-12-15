@@ -38,8 +38,6 @@ data Scalar = Numeric   Rational
 
 type ScalarObject = Object String Scalar
 
-instance ConvertAttempt Scalar Text where
-    convertAttempt = return . convertSuccess
 instance ConvertSuccess Scalar Text where
     convertSuccess (Numeric n) = convertSuccess $ show n
     convertSuccess (Text t) = t
@@ -51,20 +49,10 @@ instance ConvertSuccess Scalar Text where
         convertSuccess $ formatTime defaultTimeLocale "%FT%XZ" t
     convertSuccess Null = convertSuccess empty
 
-instance ConvertAttempt Text Scalar where
-    convertAttempt = return . convertSuccess
+{- FIXME write a real conversion here
 instance ConvertSuccess Text Scalar where
-    convertSuccess = Text -- FIXME this should be more intelligent
-
-instance ToObject (Object String Scalar) Text Text where
-    toObject = mapKeysValues convertSuccess convertSuccess
-instance FromObject (Object String Scalar) Text Text where
-   fromObject = return . toObject
-
-instance ToObject (Object Text Text) String Scalar where
-    toObject = mapKeysValues convertSuccess convertSuccess
-instance FromObject (Object Text Text) String Scalar where
-   fromObject = return . toObject
+    convertSuccess = Text
+-}
 
 -- | 'toObject' specialized for 'ScalarObject's
 toScalarObject :: ToObject a String Scalar => a -> ScalarObject
