@@ -53,10 +53,6 @@ module Data.Object.Base
     , fromObjectWrap
       -- * Helper functions
     , lookupObject
-      -- ** Scalar/Object conversions
-      -- $scalarToFromObject
-    , scalarToObject
-    , scalarFromObject
     ) where
 
 import Control.Arrow
@@ -385,20 +381,3 @@ lookupObject :: ( ConvertSuccess k' k
              -> [(k, Object k v)]
              -> Attempt o
 lookupObject key pairs = A.lookup (convertSuccess key) pairs >>= fromObject
-
--- $scalarToFromObject
--- Due to overlapping instances, we cannot automatically make all instances of
--- 'ConvertSuccess' instances of 'ToObject' (and same with
--- 'ConvertAttempt'/'FromObject'), even though the implementation is standard. Just
--- use the following functions whenever you declare 'ConvertSuccess'/'ConvertAttempt'
--- instance and you should be good.
-
--- | An appropriate 'toObject' function for any types x and y which have a
--- 'ConvertSuccess' x y instance.
-scalarToObject :: ConvertSuccess x y => x -> Object k y
-scalarToObject = Scalar . convertSuccess
-
--- | An appropriate 'fromObject' function for any types x and y which have a
--- 'ConvertAttempt' x y instance.
-scalarFromObject :: ConvertAttempt y x => Object k y -> Attempt x
-scalarFromObject = convertAttempt <=< fromScalar
