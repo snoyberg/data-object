@@ -309,19 +309,6 @@ instance ToObject (Object k v) k v where
 instance FromObject (Object k v) k v where
     fromObject = return
 
--- The following code seems too generic and will probably lead to overlapping
--- instances. It has thus been commented out.
-{-
--- Converting between different types of Objects
-instance (ConvertSuccess k k', ConvertSuccess v v')
-  => ToObject (Object k v) k' v' where
-    toObject = mapKeysValues convertSuccess convertSuccess
-
-instance (ConvertAttempt k' k, ConvertAttempt v' v)
-  => FromObject (Object k v) k' v' where
-    fromObject = mapKeysValuesM convertAttempt convertAttempt
--}
-
 -- Sequence
 instance ToObject a k v => ToObject [a] k v where
     toObject = listToObject
