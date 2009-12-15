@@ -61,13 +61,10 @@ toTextObject = toObject
 fromTextObject :: FromObject a Text Text => TextObject -> Attempt a
 fromTextObject = fromObject
 
-instance ToObject (Object String String) Text Text where
-    toObject = convertObject
-
 $(deriveSuccessConvs ''Text ''Text
     [''Text, ''String, ''BS.ByteString, ''BL.ByteString, ''TS.Text]
     [''String, ''Day, ''Int, ''Rational, ''Bool, ''BS.ByteString,
-     ''BL.ByteString, ''TS.Text
+     ''BL.ByteString, ''TS.Text, ''Text
     ])
 
 #if TEST
@@ -120,15 +117,28 @@ autoMapping = do
     let test' :: (ConvertSuccess String a,
                   ConvertSuccess a Text,
                   ConvertSuccess Text a,
-                  FromObject a Text Text,
                   Eq a,
-                  Show a)
+                  Show a,
+                  ToObject   a Text Text,
+                  FromObject a Text Text,
+                  ToObject   [a] Text Text,
+                  FromObject [a] Text Text,
+                  ToObject   [(a, a)] Text Text,
+                  FromObject [(a, a)] Text Text,
+                  ToObject   [TextObject] Text Text,
+                  FromObject [TextObject] Text Text,
+                  ToObject   [(a, TextObject)] Text Text,
+                  FromObject [(a, TextObject)] Text Text)
              => a -> Assertion
         test' a = do
             let dummy' = map (cs *** cs) dummy `asTypeOf` [(a, a)]
-                dummy'' = mTO dummy' :: TextObject
+                dummy'' = toTextObject dummy'
             dummy'' @?= expected
-            Just dummy' @=? fa (omFO expected)
+            Just dummy' @=? fa (fromTextObject expected)
+            let dummyO = map (cs *** toObject) dummy `asTypeOf`
+                            [(a, undefined :: TextObject)]
+            expected @=? toTextObject dummyO
+            Just dummyO @=? fa (fromTextObject expected)
     test' (undefined :: String)
     test' (undefined :: Text)
     test' (undefined :: BS.ByteString)

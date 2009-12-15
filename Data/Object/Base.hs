@@ -3,7 +3,6 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE ExistentialQuantification #-}
-{-# LANGUAGE OverlappingInstances #-}
 {-# LANGUAGE TemplateHaskell #-}
 ---------------------------------------------------------
 --
@@ -312,6 +311,7 @@ class ToObject a k v where
 class FromObject a k v where
     fromObject :: Object k v -> Attempt a
 
+{- FIXME: Make sure the Template Haskell generates all of these.
 -- Scalar
 instance ToObject v k v where
     toObject = Scalar
@@ -348,6 +348,7 @@ instance ToObject [(k, Object k v)] k v where
     toObject = Mapping
 instance FromObject [(k, Object k v)] k v where
     fromObject = fromMapping
+-}
 
 -- | Wraps any 'Exception' thrown during a 'fromObject' call.
 data FromObjectException = forall e. Exception e => FromObjectException e
@@ -420,37 +421,44 @@ deriveSuccessConvs dk dv sks svs = do
     lfo <- [|lFO|]
     mto <- [|mTO|]
     mfo <- [|mFO|]
+    olto <- [|olTO|]
+    olfo <- [|olFO|]
+    omto <- [|omTO|]
+    omfo <- [|omFO|]
+    co <- [|convertObject|]
+    coa <- [|convertObjectM|]
     let valOnly = concatMap (helper1 sto sfo lto lfo) svs
-        both = concatMap (helper2 mto mfo) pairs
-    return $ valOnly ++ both
+        both = concatMap (helper2 mto mfo olto olfo co coa) pairs
+        keyOnly = concatMap (helper3 omto omfo) sks
+    return $ valOnly ++ both ++ keyOnly
       where
         to = ConT $ mkName "ToObject"
         fo = ConT $ mkName "FromObject"
         to' = mkName "toObject"
         fo' = mkName "fromObject"
         helper1 sto sfo lto lfo sv =
-            [ InstanceD
+            [ InstanceD -- ToObject sv dk dv
                 []
                 (to `AppT` ConT sv `AppT` ConT dk `AppT` ConT dv)
                 [ FunD to'
                     [ Clause [] (NormalB sto) []
                     ]
                 ]
-            , InstanceD
+            , InstanceD -- FromObject sv dk dv
                 []
                 (fo `AppT` ConT sv `AppT` ConT dk `AppT` ConT dv)
                 [ FunD fo'
                     [ Clause [] (NormalB sfo) []
                     ]
                 ]
-            , InstanceD
+            , InstanceD -- ToObject [sv] dk dv
                 []
                 (to `AppT` (AppT ListT (ConT sv)) `AppT` ConT dk `AppT` ConT dv)
                 [ FunD to'
                     [ Clause [] (NormalB lto) []
                     ]
                 ]
-            , InstanceD
+            , InstanceD -- FromObject [sv] dk dv
                 []
                 (fo `AppT` (AppT ListT (ConT sv)) `AppT` ConT dk `AppT` ConT dv)
                 [ FunD fo'
@@ -458,8 +466,8 @@ deriveSuccessConvs dk dv sks svs = do
                     ]
                 ]
             ]
-        helper2 mto mfo (sk, sv) =
-            [ InstanceD
+        helper2 mto mfo olto olfo co coa (sk, sv) =
+            [ InstanceD -- ToObject [(sk, sv)] dk dv
                 []
                 (to `AppT` (ListT `AppT`
                             (TupleT 2 `AppT` ConT sk `AppT` ConT sv)
@@ -469,7 +477,7 @@ deriveSuccessConvs dk dv sks svs = do
                     [ Clause [] (NormalB mto) []
                     ]
                 ]
-            , InstanceD
+            , InstanceD -- FromObject [(sk, sv)] dk dv
                 []
                 (fo `AppT` (ListT `AppT`
                             (TupleT 2 `AppT` ConT sk `AppT` ConT sv)
@@ -477,6 +485,72 @@ deriveSuccessConvs dk dv sks svs = do
                     `AppT` ConT dk `AppT` ConT dv)
                 [ FunD fo'
                     [ Clause [] (NormalB mfo) []
+                    ]
+                ]
+            , InstanceD -- ToObject [Object sk sv] dk dv
+                []
+                (to `AppT` (ListT `AppT`
+                            (ConT (mkName "Object") `AppT` ConT sk
+                                                    `AppT` ConT sv)
+                           )
+                    `AppT` ConT dk `AppT` ConT dv)
+                [ FunD to'
+                    [ Clause [] (NormalB olto) []
+                    ]
+                ]
+            , InstanceD -- FromObject [Object sk sv] dk dv
+                []
+                (fo `AppT` (ListT `AppT`
+                            (ConT (mkName "Object") `AppT` ConT sk
+                                                    `AppT` ConT sv)
+                           )
+                    `AppT` ConT dk `AppT` ConT dv)
+                [ FunD fo'
+                    [ Clause [] (NormalB olfo) []
+                    ]
+                ]
+            , InstanceD -- ToObject (Object sk sv) dk dv
+                []
+                (to `AppT` (ConT (mkName "Object") `AppT` ConT sk
+                                                    `AppT` ConT sv)
+                    `AppT` ConT dk `AppT` ConT dv)
+                [ FunD to'
+                    [ Clause [] (NormalB co) []
+                    ]
+                ]
+            , InstanceD -- FromObject (Object sk sv) dk dv
+                []
+                (fo `AppT` (ConT (mkName "Object") `AppT` ConT sk
+                                                    `AppT` ConT sv)
+                    `AppT` ConT dk `AppT` ConT dv)
+                [ FunD fo'
+                    [ Clause [] (NormalB coa) []
+                    ]
+                ]
+            ]
+        helper3 omto omfo sk =
+            [ InstanceD -- ToObject [(sk, Object sk sv)] dk dv
+                []
+                (to `AppT`
+                 (ListT `AppT`
+                  (TupleT 2 `AppT` ConT sk
+                            `AppT` (ConT (mkName "Object") `AppT`
+                                    ConT dk `AppT` ConT dv)
+                  )) `AppT` ConT dk `AppT` ConT dv)
+                [ FunD to'
+                    [ Clause [] (NormalB omto) []
+                    ]
+                ]
+            , InstanceD -- FromObject [(sk, Object sk sv)] dk dv
+                []
+                (fo `AppT`
+                 (ListT `AppT`
+                  (TupleT 2 `AppT` ConT sk
+                            `AppT` (ConT (mkName "Object") `AppT`
+                                    ConT dk `AppT` ConT dv)
+                  )) `AppT` ConT dk `AppT` ConT dv)
+                [ FunD fo'
+                    [ Clause [] (NormalB omfo) []
                     ]
                 ]
             ]
