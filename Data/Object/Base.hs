@@ -4,6 +4,7 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE ExistentialQuantification #-}
 {-# LANGUAGE OverlappingInstances #-}
+{-# LANGUAGE TemplateHaskell #-}
 ---------------------------------------------------------
 --
 -- Module        : Data.Object.Base
@@ -66,6 +67,8 @@ module Data.Object.Base
     , olFO
     , omTO
     , omFO
+      -- * Automatic deriving of instances
+    , deriveSuccessConvs
       -- * Helper functions
     , lookupObject
     ) where
@@ -76,7 +79,7 @@ import Control.Monad (ap, (<=<))
 
 import Prelude hiding (mapM, sequence)
 
-import Data.Foldable
+import Data.Foldable hiding (concatMap)
 import Data.Traversable
 import Data.Monoid
 
@@ -86,6 +89,7 @@ import Control.Exception (Exception)
 import Data.Attempt
 
 import Data.Convertible.Text
+import Language.Haskell.TH
 
 -- | Can represent nested values as scalars, sequences and mappings.  A
 -- sequence is synonymous with a list, while a mapping is synonymous with a
@@ -399,6 +403,83 @@ omFO :: (ConvertAttempt k k', FromObject x k v)
 omFO =
       mapM (runKleisli (Kleisli ca *** Kleisli fromObject))
   <=< fromMapping
+
+deriveSuccessConvs :: Name -- ^ dest key
+                   -> Name -- ^ dest value
+                   -> [Name] -- ^ source keys
+                   -> [Name] -- ^ source values
+                   -> Q [Dec]
+deriveSuccessConvs dk dv sks svs = do
+    let pairs = do
+            sk <- sks
+            sv <- svs
+            return (sk, sv)
+    sto <- [|sTO|]
+    sfo <- [|sFO|]
+    lto <- [|lTO|]
+    lfo <- [|lFO|]
+    mto <- [|mTO|]
+    mfo <- [|mFO|]
+    let valOnly = concatMap (helper1 sto sfo lto lfo) svs
+        both = concatMap (helper2 mto mfo) pairs
+    return $ valOnly ++ both
+      where
+        to = ConT $ mkName "ToObject"
+        fo = ConT $ mkName "FromObject"
+        to' = mkName "toObject"
+        fo' = mkName "fromObject"
+        helper1 sto sfo lto lfo sv =
+            [ InstanceD
+                []
+                (to `AppT` ConT sv `AppT` ConT dk `AppT` ConT dv)
+                [ FunD to'
+                    [ Clause [] (NormalB sto) []
+                    ]
+                ]
+            , InstanceD
+                []
+                (fo `AppT` ConT sv `AppT` ConT dk `AppT` ConT dv)
+                [ FunD fo'
+                    [ Clause [] (NormalB sfo) []
+                    ]
+                ]
+            , InstanceD
+                []
+                (to `AppT` (AppT ListT (ConT sv)) `AppT` ConT dk `AppT` ConT dv)
+                [ FunD to'
+                    [ Clause [] (NormalB lto) []
+                    ]
+                ]
+            , InstanceD
+                []
+                (fo `AppT` (AppT ListT (ConT sv)) `AppT` ConT dk `AppT` ConT dv)
+                [ FunD fo'
+                    [ Clause [] (NormalB lfo) []
+                    ]
+                ]
+            ]
+        helper2 mto mfo (sk, sv) =
+            [ InstanceD
+                []
+                (to `AppT` (ListT `AppT`
+                            (TupleT 2 `AppT` ConT sk `AppT` ConT sv)
+                           )
+                    `AppT` ConT dk `AppT` ConT dv)
+                [ FunD to'
+                    [ Clause [] (NormalB mto) []
+                    ]
+                ]
+            , InstanceD
+                []
+                (fo `AppT` (ListT `AppT`
+                            (TupleT 2 `AppT` ConT sk `AppT` ConT sv)
+                           )
+                    `AppT` ConT dk `AppT` ConT dv)
+                [ FunD fo'
+                    [ Clause [] (NormalB mfo) []
+                    ]
+                ]
+            ]
 
 -- | An equivalent of 'lookup' to deal specifically with maps of 'Object's. In
 -- particular, it will:

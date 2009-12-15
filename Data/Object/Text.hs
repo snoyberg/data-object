@@ -4,6 +4,7 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE TemplateHaskell #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 ---------------------------------------------------------
 --
@@ -32,12 +33,11 @@ import Data.Object.Base
 import Data.Text.Lazy (Text)
 import Data.Attempt
 
-import Data.Convertible.Text
-
 import Data.Time.Calendar
 
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as BL
+import qualified Data.Text as TS
 
 #if TEST
 import Test.Framework (testGroup, Test)
@@ -47,6 +47,7 @@ import Test.HUnit hiding (Test)
 import Test.QuickCheck
 
 import Control.Arrow ((***))
+import Data.Convertible.Text
 #endif
 
 -- | 'Object's with keys and values of type 'Text'.
@@ -63,37 +64,11 @@ fromTextObject = fromObject
 instance ToObject (Object String String) Text Text where
     toObject = convertObject
 
-instance ToObject String Text Text where
-    toObject = sTO
-instance ToObject Day Text Text where
-    toObject = sTO
-instance ToObject Int Text Text where
-    toObject = sTO
-instance ToObject Rational Text Text where
-    toObject = sTO
-instance ToObject Bool Text Text where
-    toObject = sTO
-
-instance FromObject String Text Text where
-    fromObject = sFO
-instance FromObject Day Text Text where
-    fromObject = sFO
-instance FromObject Int Text Text where
-    fromObject = sFO
-instance FromObject Rational Text Text where
-    fromObject = sFO
-instance FromObject Bool Text Text where
-    fromObject = sFO
-
-instance ToObject BL.ByteString Text Text where
-    toObject = sTO
-instance FromObject BL.ByteString Text Text where
-    fromObject = sFO
-
-instance ToObject BS.ByteString Text Text where
-    toObject = sTO
-instance FromObject BS.ByteString Text Text where
-    fromObject = sFO
+$(deriveSuccessConvs ''Text ''Text
+    [''Text, ''String, ''BS.ByteString, ''BL.ByteString, ''TS.Text]
+    [''String, ''Day, ''Int, ''Rational, ''Bool, ''BS.ByteString,
+     ''BL.ByteString, ''TS.Text
+    ])
 
 #if TEST
 testSuite :: Test

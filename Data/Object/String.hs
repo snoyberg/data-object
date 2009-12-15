@@ -2,6 +2,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TypeSynonymInstances #-}
+{-# LANGUAGE TemplateHaskell #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 ---------------------------------------------------------
 --
@@ -24,14 +25,9 @@ module Data.Object.String
     ) where
 
 import Data.Object.Base
-import Data.Object.Text
 import Data.Attempt
-import Control.Monad ((<=<))
-
-import Data.Convertible.Text
 
 import Data.Time.Calendar
-import Data.Ratio (Ratio)
 
 type StringObject = Object String String
 
@@ -45,24 +41,6 @@ fromStringObject :: FromObject a String String
                  -> Attempt a
 fromStringObject = fromObject
 
-instance ToObject String String String where
-    toObject = Scalar
-instance ToObject Day String String where
-    toObject = Scalar . convertSuccess
-instance ToObject Int String String where
-    toObject = Scalar . convertSuccess
-instance ToObject (Ratio Integer) String String where
-    toObject = Scalar . convertSuccess
-instance ToObject Bool String String where
-    toObject = Scalar . convertSuccess
-
-instance FromObject String String String where
-    fromObject = convertAttempt <=< fromScalar
-instance FromObject Day String String where
-    fromObject = convertAttempt <=< fromScalar
-instance FromObject Int String String where
-    fromObject = convertAttempt <=< fromScalar
-instance FromObject (Ratio Integer) String String where
-    fromObject = convertAttempt <=< fromScalar
-instance FromObject Bool String String where
-    fromObject = convertAttempt <=< fromScalar
+$(deriveSuccessConvs ''String ''String
+    [''String]
+    [''String, ''Day, ''Int, ''Rational, ''Bool])
