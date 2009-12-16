@@ -32,14 +32,14 @@ import Data.Time.Calendar
 type StringObject = Object String String
 
 -- | 'toObject' specialized for 'StringObject's
-toStringObject :: ToObject a String String => a -> StringObject
-toStringObject = toObject
+toStringObject :: ConvertSuccess a StringObject => a -> StringObject
+toStringObject = cs
 
 -- | 'fromObject' specialized for 'StringObject's
-fromStringObject :: FromObject a String String
+fromStringObject :: ConvertAttempt StringObject a
                  => StringObject
                  -> Attempt a
-fromStringObject = fromObject
+fromStringObject = ca
 
 $(deriveSuccessConvs ''String ''String
     [''String]

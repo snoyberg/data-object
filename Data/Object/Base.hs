@@ -49,12 +49,6 @@ module Data.Object.Base
     , fromScalar
     , fromSequence
     , fromMapping
-      -- * Higher level conversions
-    , ToObject (..)
-    , FromObject (..)
-      -- ** Wrapping 'FromObject'
-    , FromObjectException (..)
-    , fromObjectWrap
       -- * Common object conversions
     , sTO
     , sFO
@@ -70,6 +64,8 @@ module Data.Object.Base
     , deriveSuccessConvs
       -- * Helper functions
     , lookupObject
+      -- * Re-export
+    , module Data.Convertible.Text
     ) where
 
 import Control.Arrow
@@ -78,7 +74,7 @@ import Control.Monad (ap, (<=<))
 
 import Prelude hiding (mapM, sequence)
 
-import Data.Foldable hiding (concatMap)
+import Data.Foldable hiding (concatMap, concat)
 import Data.Traversable
 import Data.Monoid
 
@@ -221,148 +217,6 @@ fromMapping :: MonadFailure ObjectExtractError m
 fromMapping (Mapping m) = return m
 fromMapping _ = failure ExpectedMapping
 
--- | Something which can be converted from a to 'Object' k v with guaranteed
--- success. A somewhat unusual but very simple example would be:
---
--- @
---    data TestScore = TestScore { name :: String, score :: Int }
---    instance ToObject [TestScore] String Int where
---        {- Explicit version, slightly tedious
---        toObject = Mapping . map (name &&& Scalar . score)
---        -}
---        {- Or, just let toObject figure it out for you! -}
---        toObject = toObject . map (name &&& score)
--- @
---
--- Then toObject [TestScore \"Abe\" 5, TestScore \"Bill\" 2] would produce, in
--- JSON format, {\"Abe\":5,\"Bill\":2}.
---
--- The purpose of showing these two versions of the implementation are to give
--- an idea of the power of 'toObject'. Since many basic instances of 'ToObject'
--- are included, you can often times avoid using the 'Object' constructors
--- directly and simply call 'toObject'.
---
--- In the first version of the code, we explicitly convert each TestScore into a
--- (String, Object String Int); notice how we must use \"Scalar . score\". We
--- then need to wrap that whole structure into a 'Mapping' constructor.
---
--- In the second version, we just convert each TestScore into a ('String',
--- 'Int') pair, then use a built-in instance of 'ToObject' to convert [(k, v)]
--- into Object k v.
---
--- Please read the documentation on 'FromObject' to see how this same approach
--- is used on the reverse end of the conversion for an even more powerful
--- result.
---
--- Minimal complete definition: 'toObject'.
-class ToObject a k v where
-    toObject :: a -> Object k v
-
--- | Something which can attempt a conversion from 'Object' k v to a with a
--- possibility of failure. To finish off with the example in 'ToObject':
---
--- @
---      data TestScore = TestScore { name :: String, score :: Int }
---      instance FromObject [TestScore] String Int where
---          {- Verbose, simple version
---          fromObject o = do
---              objectPairs <- fromMapping o
---              pairs <- mapM getScalarFromSecond objectPairs
---              return $ map testScoreFromPair pairs
---              where
---                  getScalarFromSecond :: (k, Object k v)
---                                      -> Attempt (k, v)
---                  getScalarFromSecond (k, v) = do
---                      v' <- fromScalar v
---                      return (k, v')
---                  testScoreFromPair :: (String, Int) -> TestScore
---                  testScoreFromPair (n, s) = TestScore n s
---          -}
---          {- Complicated, short version
---          fromObject =
---              mapM (fmap (uncurry TestScore)
---                   . runKleisli (second $ Kleisli `fromScalar`))
---              <=< `fromMapping`
---          -}
---          {- And this is just cheating -}
---          fromObject o = map (uncurry TestScore) \``fmap`\` fromObject o
--- @
---
--- Hopefully this example demonstrates how powerful an idea fromObject can be.
--- In this example, there are two things that could cause problems with the
--- data:
---
--- 1. The initial value may not be a 'Mapping'.
---
--- 2. Given that it is a 'Mapping', one of its values may not be a 'Scalar'.
---
--- Starting with the verbose version, we use 'getMapping' to ensure that we are
--- dealing with a 'Mapping' and 'getScalarFromSecond' to ensure that all values
--- in that 'Mapping' are in fact 'Scalar's. In the complicated version, we do
--- the exact same thing, instead using 'Kleisli' arrows to do the heavy lifting
--- in tuples.
---
--- However, the \"cheating\" version simply (ab)uses the fact that there are
--- already instances of 'FromObject' to deal with conversion from 'Object' k v
--- to [(k, v)]. The only thing left is to convert those pairs into
--- 'TestScore's.
---
--- Minimal complete definition: 'fromObject'.
-class FromObject a k v where
-    fromObject :: Object k v -> Attempt a
-
-{- FIXME: Make sure the Template Haskell generates all of these.
--- Scalar
-instance ToObject v k v where
-    toObject = Scalar
-instance FromObject v k v where
-    fromObject = fromScalar
-
--- Sequence
-instance ToObject [v] k v where
-    toObject = Sequence . map Scalar
-instance FromObject [v] k v where
-    fromObject = mapM fromScalar <=< fromSequence
-
--- Mapping
-instance ToObject [(k, v)] k v where
-    toObject = Mapping . map (second Scalar)
-instance FromObject [(k, v)] k v where
-    fromObject =
-        mapM (runKleisli (second (Kleisli fromScalar))) <=< fromMapping
-
--- Object Scalar
-instance ToObject (Object k v) k v where
-    toObject = id
-instance FromObject (Object k v) k v where
-    fromObject = return
-
--- Object Sequence
-instance ToObject [Object k v] k v where
-    toObject = Sequence
-instance FromObject [Object k v] k v where
-    fromObject = fromSequence
-
--- Object Mapping
-instance ToObject [(k, Object k v)] k v where
-    toObject = Mapping
-instance FromObject [(k, Object k v)] k v where
-    fromObject = fromMapping
--}
-
--- | Wraps any 'Exception' thrown during a 'fromObject' call.
-data FromObjectException = forall e. Exception e => FromObjectException e
-    deriving Typeable
-instance Show FromObjectException where
-    show (FromObjectException e) = "FromObjectException " ++ show e
-instance Exception FromObjectException
-
--- | Calls 'fromObject' and wraps any 'Exception's in a 'FromObjectException'.
-fromObjectWrap :: (FromObject x k y, MonadFailure FromObjectException m)
-               => Object k y
-               -> m x
-fromObjectWrap = attempt (failure . FromObjectException) return . fromObject
-
 sTO :: ConvertSuccess v v' => v -> Object k v'
 sTO = Scalar . cs
 
@@ -387,23 +241,21 @@ mFO =
     mapM (runKleisli (Kleisli ca *** Kleisli sFO))
  <=< fromMapping
 
-olTO :: ToObject x k v => [x] -> Object k v
-olTO = Sequence . map toObject
+olTO :: ConvertSuccess x (Object k v) => [x] -> Object k v
+olTO = Sequence . map cs
 
-olFO :: FromObject x k v => Object k v -> Attempt [x]
-olFO = mapM fromObject <=< fromSequence
+olFO :: ConvertAttempt (Object k v) x => Object k v -> Attempt [x]
+olFO = mapM ca <=< fromSequence
 
-omTO :: (ConvertSuccess k' k, ToObject x k v)
+omTO :: (ConvertSuccess k' k, ConvertSuccess x (Object k v))
                  => [(k', x)]
                  -> Object k v
-omTO = Mapping . map (cs *** toObject)
+omTO = Mapping . map (cs *** cs)
 
-omFO :: (ConvertAttempt k k', FromObject x k v)
+omFO :: (ConvertAttempt k k', ConvertAttempt (Object k v) x)
                    => Object k v
                    -> Attempt [(k', x)]
-omFO =
-      mapM (runKleisli (Kleisli ca *** Kleisli fromObject))
-  <=< fromMapping
+omFO = mapM (runKleisli (Kleisli ca *** Kleisli ca)) <=< fromMapping
 
 deriveSuccessConvs :: Name -- ^ dest key
                    -> Name -- ^ dest value
@@ -411,10 +263,6 @@ deriveSuccessConvs :: Name -- ^ dest key
                    -> [Name] -- ^ source values
                    -> Q [Dec]
 deriveSuccessConvs dk dv sks svs = do
-    let pairs = do
-            sk <- sks
-            sv <- svs
-            return (sk, sv)
     sto <- [|sTO|]
     sfo <- [|sFO|]
     lto <- [|lTO|]
@@ -427,132 +275,49 @@ deriveSuccessConvs dk dv sks svs = do
     omfo <- [|omFO|]
     co <- [|convertObject|]
     coa <- [|convertObjectM|]
-    let valOnly = concatMap (helper1 sto sfo lto lfo) svs
-        both = concatMap (helper2 mto mfo olto olfo co coa) pairs
-        keyOnly = concatMap (helper3 omto omfo) sks
+    let sks' = map ConT sks
+        svs' = map ConT svs
+        pairs = do
+            sk <- sks'
+            sv <- svs'
+            return (sk, sv)
+    let valOnly = concatMap (helper1 sto sfo lto lfo) svs'
+        both = concatMap (helper2 mto mfo olto olfo co coa omto omfo) pairs
+        keyOnly = concatMap (helper3 omto omfo) sks'
     return $ valOnly ++ both ++ keyOnly
       where
-        to = ConT $ mkName "ToObject"
-        fo = ConT $ mkName "FromObject"
-        to' = mkName "toObject"
-        fo' = mkName "fromObject"
-        helper1 sto sfo lto lfo sv =
-            [ InstanceD -- ToObject sv dk dv
-                []
-                (to `AppT` ConT sv `AppT` ConT dk `AppT` ConT dv)
-                [ FunD to'
-                    [ Clause [] (NormalB sto) []
-                    ]
-                ]
-            , InstanceD -- FromObject sv dk dv
-                []
-                (fo `AppT` ConT sv `AppT` ConT dk `AppT` ConT dv)
-                [ FunD fo'
-                    [ Clause [] (NormalB sfo) []
-                    ]
-                ]
-            , InstanceD -- ToObject [sv] dk dv
-                []
-                (to `AppT` (AppT ListT (ConT sv)) `AppT` ConT dk `AppT` ConT dv)
-                [ FunD to'
-                    [ Clause [] (NormalB lto) []
-                    ]
-                ]
-            , InstanceD -- FromObject [sv] dk dv
-                []
-                (fo `AppT` (AppT ListT (ConT sv)) `AppT` ConT dk `AppT` ConT dv)
-                [ FunD fo'
-                    [ Clause [] (NormalB lfo) []
-                    ]
-                ]
+        dk' = ConT dk
+        dv' = ConT dv
+        objectt k v = ConT (mkName "Object") `AppT` k `AppT` v
+        to' src = ConT (mkName "ConvertSuccess") `AppT` src `AppT`
+                  objectt dk' dv'
+        fo' dst = ConT (mkName "ConvertAttempt") `AppT`
+                  objectt dk' dv' `AppT` dst
+        cs' = mkName "convertSuccess"
+        ca' = mkName "convertAttempt"
+        to src f =
+            InstanceD [] (to' src) [FunD cs' [Clause [] (NormalB f) []]]
+        fo dst f =
+            InstanceD [] (fo' dst) [FunD ca' [Clause [] (NormalB f) []]]
+        tofo ty x y = [to ty x, fo ty y]
+        listt = AppT ListT
+        pairt k v = TupleT 2 `AppT` k `AppT` v
+        helper1 sto sfo lto lfo sv = concat
+            [ tofo sv sto sfo
+            , tofo (listt sv) lto lfo
             ]
-        helper2 mto mfo olto olfo co coa (sk, sv) =
-            [ InstanceD -- ToObject [(sk, sv)] dk dv
-                []
-                (to `AppT` (ListT `AppT`
-                            (TupleT 2 `AppT` ConT sk `AppT` ConT sv)
-                           )
-                    `AppT` ConT dk `AppT` ConT dv)
-                [ FunD to'
-                    [ Clause [] (NormalB mto) []
-                    ]
-                ]
-            , InstanceD -- FromObject [(sk, sv)] dk dv
-                []
-                (fo `AppT` (ListT `AppT`
-                            (TupleT 2 `AppT` ConT sk `AppT` ConT sv)
-                           )
-                    `AppT` ConT dk `AppT` ConT dv)
-                [ FunD fo'
-                    [ Clause [] (NormalB mfo) []
-                    ]
-                ]
-            , InstanceD -- ToObject [Object sk sv] dk dv
-                []
-                (to `AppT` (ListT `AppT`
-                            (ConT (mkName "Object") `AppT` ConT sk
-                                                    `AppT` ConT sv)
-                           )
-                    `AppT` ConT dk `AppT` ConT dv)
-                [ FunD to'
-                    [ Clause [] (NormalB olto) []
-                    ]
-                ]
-            , InstanceD -- FromObject [Object sk sv] dk dv
-                []
-                (fo `AppT` (ListT `AppT`
-                            (ConT (mkName "Object") `AppT` ConT sk
-                                                    `AppT` ConT sv)
-                           )
-                    `AppT` ConT dk `AppT` ConT dv)
-                [ FunD fo'
-                    [ Clause [] (NormalB olfo) []
-                    ]
-                ]
-            , InstanceD -- ToObject (Object sk sv) dk dv
-                []
-                (to `AppT` (ConT (mkName "Object") `AppT` ConT sk
-                                                    `AppT` ConT sv)
-                    `AppT` ConT dk `AppT` ConT dv)
-                [ FunD to'
-                    [ Clause [] (NormalB co) []
-                    ]
-                ]
-            , InstanceD -- FromObject (Object sk sv) dk dv
-                []
-                (fo `AppT` (ConT (mkName "Object") `AppT` ConT sk
-                                                    `AppT` ConT sv)
-                    `AppT` ConT dk `AppT` ConT dv)
-                [ FunD fo'
-                    [ Clause [] (NormalB coa) []
-                    ]
-                ]
+        helper2 mto mfo olto olfo co coa omto omfo (sk, sv) = concat
+            [ tofo (listt $ pairt sk sv) mto mfo
+            , tofo (listt $ objectt sk sv) olto olfo
+            , if sk == dk' && sv == dv' -- avoid overlapping with identity
+                then []
+                else tofo (objectt sk sv) co coa
+            , if sk == dk' && sv == dv' -- avoid overlapping with helper3
+                then []
+                else tofo (listt $ pairt sk $ objectt sk sv) omto omfo
             ]
-        helper3 omto omfo sk =
-            [ InstanceD -- ToObject [(sk, Object sk sv)] dk dv
-                []
-                (to `AppT`
-                 (ListT `AppT`
-                  (TupleT 2 `AppT` ConT sk
-                            `AppT` (ConT (mkName "Object") `AppT`
-                                    ConT dk `AppT` ConT dv)
-                  )) `AppT` ConT dk `AppT` ConT dv)
-                [ FunD to'
-                    [ Clause [] (NormalB omto) []
-                    ]
-                ]
-            , InstanceD -- FromObject [(sk, Object sk sv)] dk dv
-                []
-                (fo `AppT`
-                 (ListT `AppT`
-                  (TupleT 2 `AppT` ConT sk
-                            `AppT` (ConT (mkName "Object") `AppT`
-                                    ConT dk `AppT` ConT dv)
-                  )) `AppT` ConT dk `AppT` ConT dv)
-                [ FunD fo'
-                    [ Clause [] (NormalB omfo) []
-                    ]
-                ]
+        helper3 omto omfo sk = concat
+            [ tofo (listt $ pairt sk $ objectt dk' dv') omto omfo
             ]
 
 -- | An equivalent of 'lookup' to deal specifically with maps of 'Object's. In
@@ -571,7 +336,7 @@ deriveSuccessConvs dk dv sks svs = do
 -- 4. Calls 'fromObject' automatically, so you get out the value type that you
 -- want, not just an 'Object'.
 lookupObject :: ( ConvertSuccess k' k
-                , FromObject o k v
+                , ConvertAttempt (Object k v) o
                 , Typeable k
                 , Typeable v
                 , Show k
@@ -580,4 +345,4 @@ lookupObject :: ( ConvertSuccess k' k
              => k'
              -> [(k, Object k v)]
              -> Attempt o
-lookupObject key pairs = A.lookup (convertSuccess key) pairs >>= fromObject
+lookupObject key = ca <=< A.lookup (convertSuccess key)

@@ -53,13 +53,13 @@ import Data.Convertible.Text
 -- | 'Object's with keys and values of type 'Text'.
 type TextObject = Object Text Text
 
--- | 'toObject' specialized for 'TextObject's
-toTextObject :: ToObject a Text Text => a -> TextObject
-toTextObject = toObject
+-- | 'convertSuccess' specialized for 'TextObject's
+toTextObject :: ConvertSuccess a TextObject => a -> TextObject
+toTextObject = cs
 
--- | 'fromObject' specialized for 'TextObject's
-fromTextObject :: FromObject a Text Text => TextObject -> Attempt a
-fromTextObject = fromObject
+-- | 'convertAttempt' specialized for 'TextObject's
+fromTextObject :: ConvertAttempt TextObject a => TextObject -> Attempt a
+fromTextObject = ca
 
 $(deriveSuccessConvs ''Text ''Text
     [''Text, ''String, ''BS.ByteString, ''BL.ByteString, ''TS.Text]
@@ -81,10 +81,10 @@ propMapKeysValuesId :: Object Int Int -> Bool
 propMapKeysValuesId o = mapKeysValues id id o == o
 
 -- FIXME consider making something automatic, though unlikely
-instance FromObject (Object Int Int) Text Text where
-    fromObject = convertObjectM
-instance ToObject (Object Int Int) Text Text where
-    toObject = convertObject
+instance ConvertAttempt TextObject (Object Int Int) where
+    convertAttempt = convertObjectM
+instance ConvertSuccess (Object Int Int) TextObject where
+    convertSuccess = convertObject
 
 propToFromTextObject :: Object Int Int -> Bool
 propToFromTextObject o = fa (fromTextObject (toTextObject o)) == Just o
@@ -119,23 +119,23 @@ autoMapping = do
                   ConvertSuccess Text a,
                   Eq a,
                   Show a,
-                  ToObject   a Text Text,
-                  FromObject a Text Text,
-                  ToObject   [a] Text Text,
-                  FromObject [a] Text Text,
-                  ToObject   [(a, a)] Text Text,
-                  FromObject [(a, a)] Text Text,
-                  ToObject   [TextObject] Text Text,
-                  FromObject [TextObject] Text Text,
-                  ToObject   [(a, TextObject)] Text Text,
-                  FromObject [(a, TextObject)] Text Text)
+                  ConvertSuccess a TextObject,
+                  ConvertAttempt TextObject a,
+                  ConvertSuccess [a] TextObject,
+                  ConvertAttempt TextObject [a],
+                  ConvertSuccess [(a, a)] TextObject,
+                  ConvertAttempt TextObject [(a, a)],
+                  ConvertSuccess [TextObject] TextObject,
+                  ConvertAttempt TextObject [TextObject],
+                  ConvertSuccess [(a, TextObject)] TextObject,
+                  ConvertAttempt TextObject [(a, TextObject)])
              => a -> Assertion
         test' a = do
             let dummy' = map (cs *** cs) dummy `asTypeOf` [(a, a)]
                 dummy'' = toTextObject dummy'
             dummy'' @?= expected
             Just dummy' @=? fa (fromTextObject expected)
-            let dummyO = map (cs *** toObject) dummy `asTypeOf`
+            let dummyO = map (cs *** toTextObject) dummy `asTypeOf`
                             [(a, undefined :: TextObject)]
             expected @=? toTextObject dummyO
             Just dummyO @=? fa (fromTextObject expected)

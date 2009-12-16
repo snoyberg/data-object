@@ -55,11 +55,11 @@ instance ConvertSuccess Text Scalar where
 -}
 
 -- | 'toObject' specialized for 'ScalarObject's
-toScalarObject :: ToObject a String Scalar => a -> ScalarObject
-toScalarObject = toObject
+toScalarObject :: ConvertSuccess a ScalarObject => a -> ScalarObject
+toScalarObject = cs
 
 -- | 'fromObject' specialized for 'ScalarObject's
-fromScalarObject :: FromObject a String Scalar
+fromScalarObject :: ConvertAttempt ScalarObject a
                  => ScalarObject
                  -> Attempt a
-fromScalarObject = fromObject
+fromScalarObject = ca
