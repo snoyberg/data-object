@@ -2,7 +2,7 @@ name:            data-object
 version:         0.2.0
 license:         BSD3
 license-file:    LICENSE
-author:          Michael Snoyman <michael@snoyman.com>
+author:          Michael Snoyman, Nicolas Pouillard
 maintainer:      Michael Snoyman <michael@snoyman.com>
 synopsis:        Represent hierachichal structures, called objects in JSON.
 description:     These objects show up in different places, eg JSON, Yaml.
