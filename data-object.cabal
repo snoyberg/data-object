@@ -1,5 +1,5 @@
 name:            data-object
-version:         0.2.0
+version:         0.2.0.1
 license:         BSD3
 license-file:    LICENSE
 author:          Michael Snoyman, Nicolas Pouillard
@@ -10,7 +10,7 @@ description:     These objects show up in different places, eg JSON, Yaml.
                  other libraries can share a single representation of
                  these structures.
 category:        Data
-stability:       unstable
+stability:       Stable
 cabal-version:   >= 1.2
 build-type:      Simple
 homepage:        http://github.com/snoyberg/data-object/tree/master
@@ -30,7 +30,7 @@ library
         Buildable: True
     build-depends:   base >= 4 && < 5,
                      bytestring >= 0.9.1.4 && < 1,
-                     text >= 0.5 && < 0.6,
+                     text >= 0.5 && < 0.8,
                      time >= 1.1.4 && < 1.2,
                      safe-failure >= 0.4 && < 0.5,
                      old-locale >= 1 && < 1.1,
