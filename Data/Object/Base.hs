@@ -64,6 +64,9 @@ module Data.Object.Base
     , deriveSuccessConvs
       -- * Helper functions
     , lookupObject
+    , lookupScalar
+    , lookupSequence
+    , lookupMapping
       -- * Re-export
     , module Data.Convertible.Text
     ) where
@@ -346,3 +349,27 @@ lookupObject :: ( ConvertSuccess k' k
              -> [(k, Object k v)]
              -> Attempt o
 lookupObject key = ca <=< A.lookup (convertSuccess key)
+
+lookupScalar :: ( MonadFailure ObjectExtractError m
+                , Failure (A.LookupFailure k) m
+                , Eq k)
+             => k
+             -> [(k, Object k v)]
+             -> m v
+lookupScalar key = fromScalar <=< A.lookup key
+
+lookupSequence :: ( MonadFailure ObjectExtractError m
+                  , Failure (A.LookupFailure k) m
+                  , Eq k)
+               => k
+               -> [(k, Object k v)]
+               -> m [Object k v]
+lookupSequence key = fromSequence <=< A.lookup key
+
+lookupMapping :: ( MonadFailure ObjectExtractError m
+                 , Failure (A.LookupFailure k) m
+                 , Eq k)
+              => k
+              -> [(k, Object k v)]
+              -> m [(k, Object k v)]
+lookupMapping key = fromMapping <=< A.lookup key

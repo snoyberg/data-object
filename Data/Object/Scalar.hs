@@ -27,7 +27,6 @@ import Data.Object.Base
 import System.Locale (defaultTimeLocale)
 import Data.Time.Format (formatTime)
 import Data.Attempt
-import Data.Convertible.Text
 
 data Scalar = Numeric   Rational
             | Text      Text
