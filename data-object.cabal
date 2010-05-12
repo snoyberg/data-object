@@ -1,5 +1,5 @@
 name:            data-object
-version:         0.2.1
+version:         0.3.0
 license:         BSD3
 license-file:    LICENSE
 author:          Michael Snoyman, Nicolas Pouillard
@@ -32,17 +32,8 @@ library
                      bytestring >= 0.9.1.4 && < 1,
                      text >= 0.5 && < 0.8,
                      time >= 1.1.4 && < 1.2,
-                     safe-failure >= 0.4 && < 0.5,
-                     old-locale >= 1 && < 1.1,
-                     syb,
-                     attempt >= 0.2.0 && < 0.3,
-                     convertible-text >= 0.2.0 && < 0.3,
-                     template-haskell
+                     failure >= 0.1.0 && < 0.2
     exposed-modules: Data.Object
-                     Data.Object.Base
-                     Data.Object.Text
-                     Data.Object.Scalar
-                     Data.Object.String
     ghc-options:     -Wall
 
 executable           runtests
