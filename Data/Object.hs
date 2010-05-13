@@ -52,11 +52,16 @@ module Data.Object
     , fromScalar
     , fromSequence
     , fromMapping
+      -- * Lookups
+    , lookupObject
+    , lookupScalar
+    , lookupSequence
+    , lookupMapping
     ) where
 
 import Control.Arrow
 import Control.Applicative
-import Control.Monad (ap)
+import Control.Monad (ap, (<=<))
 
 import Prelude hiding (mapM, sequence)
 
@@ -181,6 +186,7 @@ data ObjectExtractError =
     ExpectedScalar
     | ExpectedSequence
     | ExpectedMapping
+    | MissingKey String
     deriving (Typeable, Show)
 instance Exception ObjectExtractError
 
@@ -205,3 +211,30 @@ fromMapping :: Failure ObjectExtractError m
             -> m [(k, Object k v)]
 fromMapping (Mapping m) = return m
 fromMapping _ = failure ExpectedMapping
+
+lookupObject :: (Show k, Eq k, Failure ObjectExtractError m)
+             => k
+             -> [(k, Object k v)]
+             -> m (Object k v)
+lookupObject k pairs =
+    case lookup k pairs of
+        Nothing -> failure $ MissingKey $ show k
+        Just v -> return v
+
+lookupScalar :: (Show k, Eq k, Failure ObjectExtractError m)
+             => k
+             -> [(k, Object k v)]
+             -> m v
+lookupScalar k = fromScalar <=< lookupObject k
+
+lookupSequence :: (Show k, Eq k, Failure ObjectExtractError m)
+               => k
+               -> [(k, Object k v)]
+               -> m [Object k v]
+lookupSequence k = fromSequence <=< lookupObject k
+
+lookupMapping :: (Show k, Eq k, Failure ObjectExtractError m)
+              => k
+              -> [(k, Object k v)]
+              -> m [(k, Object k v)]
+lookupMapping k = fromMapping <=< lookupObject k
