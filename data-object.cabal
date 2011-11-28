@@ -1,5 +1,5 @@
 name:            data-object
-version:         0.3.1.7
+version:         0.3.1.8
 license:         BSD3
 license-file:    LICENSE
 author:          Michael Snoyman, Nicolas Pouillard
@@ -17,9 +17,9 @@ homepage:        http://github.com/snoyberg/data-object/tree/master
 
 library
     build-depends:   base >= 4 && < 5,
-                     bytestring >= 0.9.1.4 && < 1,
-                     text >= 0.5 && < 0.12,
-                     time >= 1.1.4 && < 1.4,
+                     bytestring >= 0.9.1.4,
+                     text >= 0.5,
+                     time >= 1.1.4,
                      failure >= 0.1.0 && < 0.2
     exposed-modules: Data.Object
     ghc-options:     -Wall
